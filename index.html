@@ -60,7 +60,7 @@
       margin-bottom: 1.5rem;
     }
 
-    .btn-add {
+    .btn-action {
       background: rgba(56, 189, 248, 0.15);
       color: var(--accent-color);
       border: 1px solid rgba(56, 189, 248, 0.3);
@@ -74,7 +74,7 @@
       outline: none;
     }
 
-    .btn-add:focus {
+    .btn-action:focus {
       background: var(--accent-color);
       color: #0b1120;
       box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
@@ -112,6 +112,7 @@
     .card-header {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       width: 100%;
       margin-bottom: 1rem;
     }
@@ -136,12 +137,32 @@
 
     .card-badge.deportes { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
     .card-badge.tv { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; }
+    .card-badge.cine { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
 
     .card-title {
       font-size: 1.1rem;
       font-weight: 600;
       margin-top: auto;
     }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+
+    .btn-card-edit, .btn-card-delete {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .btn-card-delete { background: rgba(239, 68, 68, 0.3); color: #fca5a5; }
 
     .modal {
       display: none;
@@ -150,6 +171,7 @@
       background: rgba(0, 0, 0, 0.8);
       align-items: center;
       justify-content: center;
+      z-index: 100;
     }
 
     .modal-content {
@@ -192,10 +214,35 @@
 
   <div class="controls-bar">
     <h2>Aplicaciones y Canales</h2>
-    <button class="btn-add" onclick="openModal()" tabindex="0">+ Añadir Canal</button>
+    <button class="btn-action" onclick="openModal()" tabindex="0">+ Añadir Canal</button>
   </div>
 
   <main class="grid" id="appsContainer">
+    <!-- Películas y Streaming Integrados -->
+    <a href="https://cuevana3e.pro/" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=cuevana3e.pro&sz=128" alt="Icono">
+        <span class="card-badge cine">Cine</span>
+      </div>
+      <div class="card-title">Cuevana 3</div>
+    </a>
+
+    <a href="https://peliculon-tv.vercel.app/" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=peliculon-tv.vercel.app&sz=128" alt="Icono">
+        <span class="card-badge cine">Cine</span>
+      </div>
+      <div class="card-title">Peliculon TV</div>
+    </a>
+
+    <a href="https://splayer.lat/" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=splayer.lat&sz=128" alt="Icono">
+        <span class="card-badge cine">Cine & Deportes</span>
+      </div>
+      <div class="card-title">SPlayer</div>
+    </a>
+
     <!-- Entretenimiento y Streaming Gratis -->
     <a href="https://pluto.tv" class="card" tabindex="0">
       <div class="card-header">
@@ -263,17 +310,20 @@
     </a>
   </main>
 
+  <!-- Modal para Agregar/Editar -->
   <div class="modal" id="addModal">
     <div class="modal-content">
-      <h3>Añadir Nuevo Canal</h3>
+      <h3 id="modalTitle">Añadir Nuevo Canal</h3>
       <input type="text" id="appName" placeholder="Nombre (ej. Mi Canal)" tabindex="0">
       <input type="url" id="appUrl" placeholder="https://..." tabindex="0">
-      <button class="btn-add" onclick="addShortcut()" tabindex="0">Guardar</button>
-      <button class="btn-add" style="background:transparent; color:white;" onclick="closeModal()" tabindex="0">Cancelar</button>
+      <button class="btn-action" onclick="saveShortcut()" tabindex="0">Guardar</button>
+      <button class="btn-action" style="background:transparent; color:white;" onclick="closeModal()" tabindex="0">Cancelar</button>
     </div>
   </div>
 
   <script>
+    let editIndex = null;
+
     function updateClock() {
       const now = new Date();
       document.getElementById('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -282,38 +332,83 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    function openModal() { document.getElementById('addModal').style.display = 'flex'; }
+    function openModal(index = null) {
+      editIndex = index;
+      const modal = document.getElementById('addModal');
+      const title = document.getElementById('modalTitle');
+      const nameInput = document.getElementById('appName');
+      const urlInput = document.getElementById('appUrl');
+
+      if (index !== null) {
+        const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
+        title.textContent = "Editar Canal";
+        nameInput.value = saved[index].name;
+        urlInput.value = saved[index].url;
+      } else {
+        title.textContent = "Añadir Nuevo Canal";
+        nameInput.value = "";
+        urlInput.value = "";
+      }
+
+      modal.style.display = 'flex';
+    }
+
     function closeModal() { document.getElementById('addModal').style.display = 'none'; }
 
     function loadCustomApps() {
       const container = document.getElementById('appsContainer');
       const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
-      saved.forEach(app => {
-        const domain = new URL(app.url).hostname;
-        const a = document.createElement('a');
-        a.href = app.url;
-        a.className = 'card';
-        a.tabIndex = 0;
-        a.innerHTML = `
+
+      saved.forEach((app, index) => {
+        let domain = "google.com";
+        try { domain = new URL(app.url).hostname; } catch(e){}
+
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.tabIndex = 0;
+        div.onclick = (e) => {
+          if (!e.target.classList.contains('btn-card-edit') && !e.target.classList.contains('btn-card-delete')) {
+            window.location.href = app.url;
+          }
+        };
+
+        div.innerHTML = `
           <div class="card-header">
             <img class="card-icon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=128" alt="Icono">
             <span class="card-badge">Personal</span>
           </div>
           <div class="card-title">${app.name}</div>
+          <div class="card-actions">
+            <button class="btn-card-edit" onclick="openModal(${index})">Editar</button>
+            <button class="btn-card-delete" onclick="deleteShortcut(${index})">Eliminar</button>
+          </div>
         `;
-        container.appendChild(a);
+        container.appendChild(div);
       });
     }
 
-    function addShortcut() {
+    function saveShortcut() {
       const name = document.getElementById('appName').value;
       const url = document.getElementById('appUrl').value;
       if (!name || !url) return;
 
       const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
-      saved.push({ name, url });
+
+      if (editIndex !== null) {
+        saved[editIndex] = { name, url };
+      } else {
+        saved.push({ name, url });
+      }
+
       localStorage.setItem('custom_tv_apps', JSON.stringify(saved));
       closeModal();
+      location.reload();
+    }
+
+    function deleteShortcut(index) {
+      const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
+      saved.splice(index, 1);
+      localStorage.setItem('custom_tv_apps', JSON.stringify(saved));
       location.reload();
     }
 
