@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart TV Launcher</title>
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0b1120 0%, #151f32 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --accent-color: #38bdf8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 2.5rem;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--accent-color);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .brand-icon svg { width: 28px; height: 28px; fill: #0b1120; }
+    .brand-text h1 { font-size: 1.8rem; font-weight: 700; }
+    .clock-container { text-align: right; }
+    .clock-time { font-size: 2rem; font-weight: 700; color: var(--text-main); }
+    .clock-date { font-size: 0.9rem; color: var(--text-muted); text-transform: capitalize; }
+
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-add {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-color);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      outline: none;
+    }
+
+    .btn-add:focus {
+      background: var(--accent-color);
+      color: #0b1120;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 2px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-decoration: none;
+      color: var(--text-main);
+      transition: all 0.2s ease;
+      outline: none;
+      min-height: 140px;
+      position: relative;
+    }
+
+    .card:focus {
+      border-color: var(--accent-color);
+      transform: scale(1.05);
+      background: rgba(51, 65, 85, 0.9);
+      box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #0f172a;
+    }
+
+    .card-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+    }
+
+    .card-badge.deportes { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+    .card-badge.tv { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: auto;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: #1e293b;
+      padding: 2rem;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .modal-content input {
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>TV Launcher</h1>
+      </div>
+    </div>
+
+    <div class="clock-container">
+      <div class="clock-time" id="clock">00:00</div>
+      <div class="clock-date" id="date">--</div>
+    </div>
+  </header>
+
+  <div class="controls-bar">
+    <h2>Aplicaciones y Canales</h2>
+    <button class="btn-add" onclick="openModal()" tabindex="0">+ Añadir Canal</button>
+  </div>
+
+  <main class="grid" id="appsContainer">
+    <!-- Entretenimiento y Streaming Gratis -->
+    <a href="https://pluto.tv" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
+        <span class="card-badge tv">TV Gratis</span>
+      </div>
+      <div class="card-title">Pluto TV</div>
+    </a>
+
+    <a href="https://watch.plex.tv" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=plex.tv&sz=128" alt="Icono">
+        <span class="card-badge">Streaming</span>
+      </div>
+      <div class="card-title">Plex TV</div>
+    </a>
+
+    <a href="https://vix.com" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=vix.com&sz=128" alt="Icono">
+        <span class="card-badge tv">TV Gratis</span>
+      </div>
+      <div class="card-title">ViX Gratis</div>
+    </a>
+
+    <a href="https://rakuten.tv" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rakuten.tv&sz=128" alt="Icono">
+        <span class="card-badge tv">TV Gratis</span>
+      </div>
+      <div class="card-title">Rakuten TV</div>
+    </a>
+
+    <a href="https://youtube.com/tv" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
+        <span class="card-badge">Streaming</span>
+      </div>
+      <div class="card-title">YouTube TV</div>
+    </a>
+
+    <!-- Deportes y Fútbol en Vivo -->
+    <a href="https://pluto.tv/on-demand/sports" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
+        <span class="card-badge deportes">Deportes</span>
+      </div>
+      <div class="card-title">Pluto Deportes</div>
+    </a>
+
+    <a href="https://www.youtube.com/results?search_query=futbol+en+vivo" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
+        <span class="card-badge deportes">Deportes</span>
+      </div>
+      <div class="card-title">Fútbol en Vivo (YT)</div>
+    </a>
+
+    <a href="https://rtve.es/play/deportes" class="card" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rtve.es&sz=128" alt="Icono">
+        <span class="card-badge deportes">Deportes</span>
+      </div>
+      <div class="card-title">RTVE Deportes</div>
+    </a>
+  </main>
+
+  <div class="modal" id="addModal">
+    <div class="modal-content">
+      <h3>Añadir Nuevo Canal</h3>
+      <input type="text" id="appName" placeholder="Nombre (ej. Mi Canal)" tabindex="0">
+      <input type="url" id="appUrl" placeholder="https://..." tabindex="0">
+      <button class="btn-add" onclick="addShortcut()" tabindex="0">Guardar</button>
+      <button class="btn-add" style="background:transparent; color:white;" onclick="closeModal()" tabindex="0">Cancelar</button>
+    </div>
+  </div>
+
+  <script>
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('date').textContent = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function openModal() { document.getElementById('addModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('addModal').style.display = 'none'; }
+
+    function loadCustomApps() {
+      const container = document.getElementById('appsContainer');
+      const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
+      saved.forEach(app => {
+        const domain = new URL(app.url).hostname;
+        const a = document.createElement('a');
+        a.href = app.url;
+        a.className = 'card';
+        a.tabIndex = 0;
+        a.innerHTML = `
+          <div class="card-header">
+            <img class="card-icon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=128" alt="Icono">
+            <span class="card-badge">Personal</span>
+          </div>
+          <div class="card-title">${app.name}</div>
+        `;
+        container.appendChild(a);
+      });
+    }
+
+    function addShortcut() {
+      const name = document.getElementById('appName').value;
+      const url = document.getElementById('appUrl').value;
+      if (!name || !url) return;
+
+      const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
+      saved.push({ name, url });
+      localStorage.setItem('custom_tv_apps', JSON.stringify(saved));
+      closeModal();
+      location.reload();
+    }
+
+    loadCustomApps();
+  </script>
+</body>
+</html>
