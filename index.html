@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Dominio del backend. Vacío = mismo dominio que esta página.
+       Ejemplo: https://tv-api.vercel.app -->
+  <meta name="tv-api" content="">
   <title>TV · Buscador de películas</title>
   <style>
     :root {
@@ -474,6 +477,9 @@
     const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : "#"; } catch { return "#"; } };
     const STORAGE_KEY = 'custom_tv_apps';
 
+    // Backend: el de esta misma página si no se indica otro dominio.
+    const API = (document.querySelector('meta[name="tv-api"]')?.content || '').replace(/\/+$/, '');
+
     // Los resultados viven en /resultados cuando lo sirve el binario de Go. Si
     // la página se abre como archivo suelto o en un hosting estático, esa ruta
     // daría 404, así que se cae al archivo real.
@@ -525,7 +531,7 @@
       if (q.length < 2) return hideSug();
       sugTimer = setTimeout(async () => {
         try {
-          const res = await fetch('/api/suggest?q=' + encodeURIComponent(q));
+          const res = await fetch(API + '/api/suggest?q=' + encodeURIComponent(q));
           const data = await res.json();
           sugItems = data.results || [];
           drawSug();

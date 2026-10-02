@@ -668,6 +668,55 @@ func TestCompressGzipYDocsPages(t *testing.T) {
 	}
 }
 
+// TestCORSParaOtroDominio permite que el HTML se sirva desde un hosting
+// estático (Vercel, Netlify, GitHub Pages) y consulte la API en otro dominio.
+func TestCORSParaOtroDominio(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[{"phrase":"matrix"}]`)
+	f.point(t)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/search?q=matrix", nil)
+	req.Header.Set("Origin", "https://mi-portal.vercel.app")
+	searchHandler(rec, req)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("Access-Control-Allow-Origin = %q, el navegador bloquearía la llamada", got)
+	}
+
+	// La verificación previa de CORS debe responder 204 sin cuerpo.
+	rec = httptest.NewRecorder()
+	pre := httptest.NewRequest("OPTIONS", "/api/search?q=matrix", nil)
+	pre.Header.Set("Origin", "https://mi-portal.vercel.app")
+	pre.Header.Set("Access-Control-Request-Method", "GET")
+	searchHandler(rec, pre)
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("preflight = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("preflight sin Access-Control-Allow-Origin: %q", got)
+	}
+}
+
+// TestBackendConfigurableEnLasPaginas comprueba que las dos páginas leen el
+// dominio del backend de un solo sitio, en la etiqueta tv-api.
+func TestBackendConfigurableEnLasPaginas(t *testing.T) {
+	for _, name := range []string{"index.html", "catalog.html"} {
+		page, err := site.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(page)
+		if !strings.Contains(s, `name="tv-api"`) {
+			t.Errorf("%s no tiene la etiqueta tv-api", name)
+		}
+		if !strings.Contains(s, "fetch(API + ") {
+			t.Errorf("%s debería usar el dominio configurable, no una ruta fija", name)
+		}
+		if strings.Contains(s, `fetch("/api/`) || strings.Contains(s, `fetch('/api/`) {
+			t.Errorf("%s tiene una llamada fija a /api/", name)
+		}
+	}
+}
+
 // TestPagesEnlazadas verifica que el launcher y los resultados se alcanzan entre sí.
 func TestPagesEnlazadas(t *testing.T) {
 	mux := http.NewServeMux()

@@ -35,6 +35,39 @@ PORT=3000 go run .
 go test ./...     # los tests no salen a internet
 ```
 
+## Dónde va el dominio del backend
+Las dos páginas leen el dominio de la API de **un solo sitio**, la etiqueta
+`tv-api` de la cabecera (`index.html`, `catalog.html`):
+
+```html
+<meta name="tv-api" content="">
+```
+
+Vacío = el backend está en el mismo dominio que la página (lo normal). Si el
+HTML se sirve desde un hosting y el backend vive en otro dominio, ahí se pone:
+
+```html
+<meta name="tv-api" content="https://tv-api.vercel.app">
+```
+
+Nada más: `fetch(API + '/api/search…')` ya usa esa variable. El backend envía
+`Access-Control-Allow-Origin: *`, así que el navegador permite la llamada
+cruzada sin configurar nada en el otro lado.
+
+### Si el backend va en Vercel
+Vercel no ejecuta un `go run`: necesita una función serverless, es decir un
+`api/index.go` con `func Handler(w http.ResponseWriter, r *http.Request)`.
+Además `//go:embed` no puede leer archivos de fuera de su carpeta, así que las
+páginas tendrían que moverse dentro del paquete. Es un refactor, no un ajuste
+de configuración.
+
+Las dos salidas:
+
+| | Qué hacer | Cuándo |
+| --- | --- | --- |
+| **A. Todo en un dominio** | Sirve el HTML y la API desde el mismo sitio (el propio Go, o el HTML como estático y `/api` con un proxy). `tv-api` vacío. | La más simple: sin CORS, sin dominios que sincronizar |
+| **B. Dominios separados** | Rellena `tv-api` con la URL del backend. | Si el HTML está en un hosting estático y el backend en otro sitio |
+
 ## Archivos
 | Archivo | De qué se ocupa |
 | --- | --- |

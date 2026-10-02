@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Dominio del backend. Vacío = mismo dominio que esta página.
+       Ejemplo: https://tv-api.vercel.app -->
+  <meta name="tv-api" content="">
   <title>TV · Resultados</title>
   <style>
     :root {
@@ -239,6 +242,8 @@
     const $ = s => document.querySelector(s);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : '#'; } catch { return '#'; } };
+    // Backend: el de esta misma página si no se indica otro dominio.
+    const API = (document.querySelector('meta[name="tv-api"]')?.content || '').replace(/\/+$/, '');
 
     // El launcher vive en / cuando lo sirve el binario de Go. Sin él (archivo
     // suelto u hosting estático) se cae al index.html para no dejar un 404.
@@ -276,7 +281,7 @@
       const mine = ++token;
       loading();
       try {
-        const res = await fetch('/api/search?q=' + encodeURIComponent(query) + '&limit=40', {
+        const res = await fetch(API + '/api/search?q=' + encodeURIComponent(query) + '&limit=40', {
           headers: { Accept: 'application/json' },
         });
         const data = await res.json();
