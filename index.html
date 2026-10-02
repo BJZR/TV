@@ -49,203 +49,28 @@
 
     .brand-icon svg { width: 26px; height: 26px; fill: #0b1120; }
     .brand-text h1 { font-size: 1.6rem; font-weight: 700; }
+    .head-right { display: flex; align-items: center; gap: 1.25rem; }
     .clock-container { text-align: right; }
     .clock-time { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
     .clock-date { font-size: 0.85rem; color: var(--text-muted); text-transform: capitalize; }
 
-    .search-section { margin-bottom: 1.5rem; position: relative; }
-
-    .search-box {
-      display: flex;
-      gap: 0.75rem;
-      background: rgba(15, 23, 42, 0.9);
-      padding: 0.75rem 1.25rem;
-      border-radius: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .search-box:focus-within {
-      border-color: var(--accent-color);
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
-    }
-
-    .search-box input {
-      background: transparent;
-      border: none;
-      color: white;
-      font-size: 1.1rem;
-      width: 100%;
-      outline: none;
-    }
-
-    .suggest {
-      display: none;
-      position: absolute;
-      left: 0; right: 0; top: calc(100% + 6px);
-      background: #0f172a;
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 14px;
-      overflow: hidden;
-      z-index: 100;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-    }
-
-    .suggest-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.6rem 1rem;
-      cursor: pointer;
-      color: var(--text-main);
-      font-size: 0.95rem;
-    }
-
-    .suggest-item:hover, .suggest-item.active { background: rgba(56, 189, 248, 0.15); }
-    .suggest-item img, .suggest-item .ph {
-      width: 32px; height: 48px; border-radius: 4px; object-fit: cover; background: #1e293b; flex-shrink: 0;
-    }
-    .suggest-item .meta { color: var(--text-muted); font-size: 0.8rem; }
-    .suggest-item .x { margin-left: auto; color: var(--text-muted); padding: 0 0.5rem; }
-    .suggest-head { padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; display: flex; justify-content: space-between; }
-    .suggest-head button { background: none; border: none; color: var(--accent-color); cursor: pointer; font-size: 0.75rem; }
-
-    .results-view {
-      display: none;
-      background: rgba(15, 23, 42, 0.95);
-      border-radius: 16px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
-      border: 2px solid var(--accent-color);
-    }
-
-    .results-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding-bottom: 0.75rem;
-    }
-
-    .results-tools {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 1.25rem;
-    }
-
-    .results-hint { display: none; margin: -0.25rem 0 1rem; font-size: 0.9rem; color: var(--text-muted); }
-    .results-hint.show { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-    .results-hint button {
+    .goto-cat {
       background: rgba(56, 189, 248, 0.15);
       color: var(--accent-color);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      padding: 0.3rem 0.7rem;
-      border-radius: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.7rem 1.1rem;
+      border-radius: 10px;
       font-weight: 600;
-      cursor: pointer;
-    }
-
-    .results-grid mark { background: rgba(56, 189, 248, 0.28); color: #fff; border-radius: 3px; padding: 0 2px; }
-
-    .empty { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; }
-    .empty p { color: var(--text-muted); line-height: 1.5; }
-
-    .sk { pointer-events: none; }
-    .sk .poster-wrap { background: linear-gradient(90deg, #1e293b 25%, #273449 50%, #1e293b 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
-    .sk .title, .sk .source { height: 0.8rem; border-radius: 6px; background: #263449; margin-bottom: 0.4rem; }
-    .sk .source { width: 55%; }
-    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-    @media (prefers-reduced-motion: reduce) { .sk .poster-wrap { animation: none; } }
-
-    .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .chip {
-      background: rgba(30, 41, 59, 0.8);
-      color: var(--text-muted);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 0.4rem 0.9rem;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      outline: none;
-    }
-    .chip.active { background: var(--accent-color); color: #0b1120; border-color: var(--accent-color); }
-    .chip:focus { border-color: white; }
-    .sort-select {
-      background: #0f172a; color: white; border: 1px solid #475569;
-      border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.85rem;
-    }
-
-    .results-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 1.25rem;
-    }
-
-    .result-card {
-      background: #1e293b;
-      border-radius: 12px;
-      color: white;
       text-decoration: none;
-      border: 2px solid transparent;
+      white-space: nowrap;
+    }
+
+    .goto-cat:hover, .goto-cat:focus {
+      background: var(--accent-color);
+      color: #0b1120;
       outline: none;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
     }
-
-    .result-card:focus, .result-card:hover {
-      border-color: var(--accent-color);
-      transform: scale(1.04);
-      background: #334155;
-      box-shadow: 0 10px 20px rgba(56, 189, 248, 0.3);
-    }
-
-    .poster-wrap { position: relative; aspect-ratio: 2 / 3; background: linear-gradient(135deg, #1e293b, #0f172a); }
-    .poster-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .poster-wrap .ph {
-      width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-      font-size: 2.5rem; font-weight: 700; color: var(--text-muted);
-    }
-    .rating {
-      position: absolute; top: 8px; right: 8px;
-      background: rgba(0, 0, 0, 0.75); color: #fbbf24;
-      font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 6px;
-    }
-    .result-card .tag {
-      position: absolute; top: 8px; left: 8px;
-      font-size: 0.65rem; font-weight: 700; color: #0b1120; text-transform: uppercase;
-      background: var(--accent-color); padding: 0.15rem 0.45rem; border-radius: 4px;
-    }
-    .result-card .info { padding: 0.75rem; }
-    .result-card .title { font-weight: 600; font-size: 0.95rem; line-height: 1.25; }
-    .result-card .source { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem; }
-
-    .detail-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 300; align-items: center; justify-content: center; padding: 1rem; }
-    .detail {
-      background: #1e293b; border-radius: 16px; width: 100%; max-width: 820px; max-height: 92vh; overflow-y: auto;
-      display: flex; gap: 1.5rem; padding: 1.5rem; position: relative;
-    }
-    .detail .d-poster { width: 200px; flex-shrink: 0; border-radius: 10px; aspect-ratio: 2/3; object-fit: cover; background: #0f172a; }
-    .detail h3 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-    .detail .tagline { color: var(--text-muted); font-style: italic; margin-bottom: 0.5rem; }
-    .detail .facts { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.75rem; }
-    .detail p.ov { line-height: 1.5; margin-bottom: 1rem; }
-    .detail h4 { margin: 1rem 0 0.5rem; font-size: 0.85rem; text-transform: uppercase; color: var(--accent-color); }
-    .prov-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .prov { display: flex; align-items: center; gap: 0.4rem; background: #0f172a; border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
-    .prov img { width: 22px; height: 22px; border-radius: 5px; }
-    .detail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
-    .detail-actions a { text-decoration: none; }
-    .detail .close { position: absolute; top: 0.75rem; right: 0.75rem; }
-    @media (max-width: 640px) { .detail { flex-direction: column; } .detail .d-poster { width: 140px; } }
 
     .filter-bar {
       display: flex;
@@ -431,36 +256,14 @@
       </div>
     </div>
 
-    <div class="clock-container">
-      <div class="clock-time" id="clock">00:00</div>
-      <div class="clock-date" id="date">--</div>
+    <div class="head-right">
+      <a class="goto-cat" href="/catalogo" tabindex="0">Ver catálogo</a>
+      <div class="clock-container">
+        <div class="clock-time" id="clock">00:00</div>
+        <div class="clock-date" id="date">--</div>
+      </div>
     </div>
   </header>
-
-  <section class="search-section">
-    <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Buscar películas, series, actores o partidos..." tabindex="0" autocomplete="off" spellcheck="false" aria-label="Buscar">
-      <button class="btn-action" id="searchBtn" tabindex="0">Buscar</button>
-    </div>
-    <div class="suggest" id="suggestBox" role="listbox"></div>
-  </section>
-
-  <section class="results-view" id="resultsView">
-    <div class="results-header">
-      <h2 id="resultsTitle">Resultados</h2>
-      <button class="btn-action" id="closeResultsBtn" tabindex="0">Cerrar Resultados</button>
-    </div>
-    <div class="results-tools">
-      <div class="chips" id="resultChips"></div>
-      <select class="sort-select" id="sortSelect" aria-label="Ordenar por">
-        <option value="relevance">Más relevantes</option>
-        <option value="rating">Mejor valoradas</option>
-        <option value="year">Más recientes</option>
-      </select>
-    </div>
-    <div class="results-hint" id="resultsHint"></div>
-    <div class="results-grid" id="resultsContent"></div>
-  </section>
 
   <nav class="filter-bar">
     <button class="filter-btn active" onclick="filterCategory('all', this)" tabindex="0">Todos</button>
@@ -566,10 +369,6 @@
     </a>
   </main>
 
-  <div class="detail-modal" id="detailModal" role="dialog" aria-modal="true">
-    <div class="detail" id="detailBody"></div>
-  </div>
-
   <div class="modal" id="addModal">
     <div class="modal-content">
       <h3 id="modalTitle">Añadir Nuevo Canal</h3>
@@ -590,14 +389,10 @@
   <script>
     let editIndex = null;
 
-    const PROD_API = "https://tv-three-lime.vercel.app";
-    const LOCAL_HOSTS = ["localhost", "127.0.0.1", new URL(PROD_API).hostname];
-    const API_BASE = LOCAL_HOSTS.includes(location.hostname) ? "" : PROD_API;
-
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : "#"; } catch { return "#"; } };
-    const TYPE_LABEL = { movie: "Película", tv: "Serie", live: "En vivo" };
+    const STORAGE_KEY = 'custom_tv_apps';
 
     function updateClock() {
       const now = new Date();
@@ -622,338 +417,39 @@
       });
     }
 
-    // ---------- Historial ----------
-    const HIST_KEY = 'tv_search_history';
-    const getHistory = () => { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch { return []; } };
-    const setHistory = h => { try { localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0, 8))); } catch {} };
-    function pushHistory(q) { setHistory([q, ...getHistory().filter(x => x.toLowerCase() !== q.toLowerCase())]); }
-
-    // ---------- Estado ----------
-    let currentResults = [], currentFilter = 'all', currentSort = 'relevance', currentQuery = '';
-    let searchCtl = null, suggestCtl = null, suggestItems = [], activeSuggest = -1, suggestTimer = null;
-    const suggestCache = new Map();
-
-    async function api(path, params, signal) {
-      const res = await fetch(`${API_BASE}${path}?${new URLSearchParams(params)}`, { signal });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-      return data;
-    }
-
-    // norm quita acentos para poder resaltar lo que el usuario escribió.
-    const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    function queryWords() {
-      return norm(currentQuery).split(/[^a-z0-9]+/).filter(w => w.length >= 2 && w.length < 30);
-    }
-
-    // highlight resalta (de forma segura) las palabras de la consulta.
-    function highlight(text) {
-      const words = queryWords();
-      if (!words.length) return esc(text);
-      return String(text ?? '').split(/(\s+)/).map(tok =>
-        tok.trim() && words.includes(norm(tok)) ? `<mark>${esc(tok)}</mark>` : esc(tok)
-      ).join('');
-    }
-
-    function skeletons(n = 8) {
-      return Array.from({ length: n }, () =>
-        `<div class="result-card sk"><div class="poster-wrap"></div><div class="info"><div class="title"></div><div class="source"></div></div></div>`).join('');
-    }
-
-    // ---------- Sugerencias ----------
-    function hideSuggest() { $('suggestBox').style.display = 'none'; activeSuggest = -1; }
-
-    function posterThumb(it) {
-      return it.poster ? `<img src="${esc(it.poster)}" alt="" loading="lazy">` : `<div class="ph"></div>`;
-    }
-
-    function renderSuggest() {
-      const box = $('suggestBox');
-      const q = $('searchInput').value.trim();
-      if (!q) {
-        const h = getHistory();
-        if (!h.length) return hideSuggest();
-        suggestItems = h.map(t => ({ kind: 'history', text: t }));
-        box.innerHTML = `<div class="suggest-head"><span>Búsquedas recientes</span><button id="clearHist">Borrar</button></div>` +
-          h.map((t, i) => `<div class="suggest-item" data-i="${i}" role="option"><span>🕘</span><span>${esc(t)}</span><span class="x" data-del="${i}">✕</span></div>`).join('');
-        $('clearHist').onmousedown = e => { e.preventDefault(); setHistory([]); hideSuggest(); };
-      } else {
-        if (!suggestItems.length) return hideSuggest();
-        box.innerHTML = suggestItems.map((it, i) => `
-          <div class="suggest-item" data-i="${i}" role="option">
-            ${posterThumb(it)}
-            <div><div>${esc(it.title)}</div><div class="meta">${esc(TYPE_LABEL[it.type] || '')}${it.year ? ' · ' + esc(it.year) : ''}${it.via ? ' · con ' + esc(it.via) : ''}</div></div>
-          </div>`).join('');
-      }
-      box.style.display = 'block';
-      activeSuggest = -1;
-      box.querySelectorAll('.suggest-item').forEach(el => {
-        el.onmousedown = e => {
-          e.preventDefault();
-          const i = +el.dataset.i;
-          if (e.target.dataset.del !== undefined) {
-            setHistory(getHistory().filter((_, k) => k !== i)); renderSuggest(); return;
-          }
-          pickSuggest(i);
-        };
-      });
-    }
-
-    function pickSuggest(i) {
-      const it = suggestItems[i];
-      if (!it) return;
-      hideSuggest();
-      if (it.kind === 'history') { $('searchInput').value = it.text; runSearch(); return; }
-      if (it.type === 'live') { window.open(safeUrl(it.url), '_blank', 'noopener'); return; }
-      openDetails(it);
-    }
-
-    function moveSuggest(dir) {
-      const els = $('suggestBox').querySelectorAll('.suggest-item');
-      if (!els.length) return;
-      activeSuggest = (activeSuggest + dir + els.length) % els.length;
-      els.forEach((e, i) => e.classList.toggle('active', i === activeSuggest));
-    }
-
-    function onInput() {
-      clearTimeout(suggestTimer);
-      const q = $('searchInput').value.trim();
-      if (q.length < 2) { suggestItems = []; renderSuggest(); return; }
-      if (suggestCache.has(q)) { suggestItems = suggestCache.get(q); renderSuggest(); return; }
-      suggestItems = [];
-      suggestTimer = setTimeout(async () => {
-        if (suggestCtl) suggestCtl.abort();
-        suggestCtl = new AbortController();
-        try {
-          const data = await api('/api/suggest', { q, limit: 6 }, suggestCtl.signal);
-          if ($('searchInput').value.trim() !== q) return;
-          const items = data.results || [];
-          suggestCache.set(q, items);
-          if (suggestCache.size > 40) suggestCache.delete(suggestCache.keys().next().value);
-          suggestItems = items;
-          renderSuggest();
-        } catch (e) { if (e.name !== 'AbortError') hideSuggest(); }
-      }, 320);
-    }
-
-    // ---------- Búsqueda completa ----------
-    async function runSearch() {
-      clearTimeout(suggestTimer);
-      if (suggestCtl) suggestCtl.abort();
-      hideSuggest();
-      const query = $('searchInput').value.trim();
-      if (!query) return;
-
-      pushHistory(query);
-      try { history.replaceState(null, '', '?q=' + encodeURIComponent(query)); } catch {}
-
-      if (searchCtl) searchCtl.abort();
-      searchCtl = new AbortController();
-
-      currentQuery = query;
-      currentFilter = 'all';
-      $('resultsTitle').textContent = `Buscando "${query}"...`;
-      $('resultsContent').innerHTML = skeletons();
-      $('resultChips').innerHTML = '';
-      $('resultsHint').className = 'results-hint';
-      $('resultsHint').innerHTML = '';
-      $('resultsView').style.display = 'block';
-
+    const readApps = () => {
       try {
-        const data = await api('/api/search', { q: query, limit: 40 }, searchCtl.signal);
-        if ($('searchInput').value.trim() !== query) return;
-        currentResults = data.results || [];
-        currentFilter = 'all';
-        $('resultsTitle').textContent = currentResults.length
-          ? `${data.total} resultado${data.total === 1 ? '' : 's'} para "${query}"${data.year ? ' (' + data.year + ')' : ''}`
-          : `Sin resultados para "${query}"`;
-        renderHint(data);
-        renderResults();
-        const first = $('resultsContent').querySelector('.result-card');
-        if (first) first.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-        console.error('Error en la búsqueda:', err);
-        $('resultsTitle').textContent = 'No se pudo completar la búsqueda';
-        $('resultChips').innerHTML = '';
-        $('resultsHint').className = 'results-hint';
-        $('resultsHint').innerHTML = '';
-        $('resultsContent').innerHTML = `<div class="empty"><p style="color:#fca5a5;">${esc(err.message)}</p></div>`;
-      }
-    }
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        return Array.isArray(saved) ? saved : [];
+      } catch { return []; }
+    };
 
-    // renderHint avisa cuando el título encontrado es aproximado.
-    function renderHint(data) {
-      const hint = $('resultsHint');
-      const dym = data.didYouMean;
-      if (!dym || !currentResults.length) {
-        hint.className = 'results-hint';
-        hint.innerHTML = '';
-        return;
-      }
-      const msg = data.spellFixed
-        ? `No encontramos "${currentQuery}" exacto. ¿Quisiste decir`
-        : `La coincidencia más cercana es`;
-      hint.className = 'results-hint show';
-      hint.innerHTML = `<span>${esc(msg)} “${esc(dym)}”?</span><button type="button">Buscar así</button>`;
-      hint.querySelector('button').onclick = () => { $('searchInput').value = dym; runSearch(); };
-    }
-
-    function renderResults() {
-      const counts = { all: currentResults.length, movie: 0, tv: 0, live: 0 };
-      currentResults.forEach(r => counts[r.type] = (counts[r.type] || 0) + 1);
-      const chips = [['all', 'Todo'], ['movie', 'Películas'], ['tv', 'Series'], ['live', 'En vivo']].filter(([k]) => k === 'all' || counts[k]);
-      $('resultChips').innerHTML = chips.length > 1 ? chips.map(([k, l]) =>
-        `<button class="chip ${currentFilter === k ? 'active' : ''}" data-f="${k}" tabindex="0">${l} (${counts[k]})</button>`).join('') : '';
-      $('resultChips').querySelectorAll('.chip').forEach(b => b.onclick = () => { currentFilter = b.dataset.f; renderResults(); });
-
-      let list = currentFilter === 'all' ? [...currentResults] : currentResults.filter(r => r.type === currentFilter);
-      if (currentSort === 'rating') list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      if (currentSort === 'year') list.sort((a, b) => (+b.year || 0) - (+a.year || 0));
-
-      const grid = $('resultsContent');
-      grid.innerHTML = '';
-      if (!list.length) {
-        const yt = safeUrl('https://www.youtube.com/results?search_query=' + encodeURIComponent(currentQuery));
-        grid.innerHTML = `<div class="empty">
-            <p>No encontramos nada para “${esc(currentQuery)}”.</p>
-            <p>Prueba con menos palabras, con el año (“${esc(currentQuery)} 2020”) o revisa la ortografía.</p>
-            <a class="btn-action" tabindex="0" href="${esc(yt)}" target="_blank" rel="noopener noreferrer">Buscar en YouTube</a>
-          </div>`;
-        return;
-      }
-      list.forEach(it => {
-        const isLive = it.type === 'live';
-        const card = document.createElement(isLive ? 'a' : 'div');
-        card.className = 'result-card';
-        card.tabIndex = 0;
-        if (isLive) { card.href = safeUrl(it.url); card.target = '_blank'; card.rel = 'noopener noreferrer'; }
-        else {
-          card.setAttribute('role', 'button');
-          card.onclick = () => openDetails(it);
-          card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails(it); } };
-        }
-        const poster = it.poster
-          ? `<img src="${esc(it.poster)}" alt="Póster de ${esc(it.title)}" loading="lazy">`
-          : `<div class="ph">${isLive ? '📡' : esc((it.title || '?')[0].toUpperCase())}</div>`;
-        card.innerHTML = `
-          <div class="poster-wrap">
-            ${poster}
-            <span class="tag">${esc(TYPE_LABEL[it.type] || it.type)}</span>
-            ${it.rating ? `<span class="rating">★ ${it.rating.toFixed(1)}</span>` : ''}
-          </div>
-          <div class="info">
-            <div class="title">${esc(it.title)}</div>
-            <div class="source">${it.year ? esc(it.year) + ' · ' : ''}${it.via ? 'con ' + esc(it.via) : esc(it.source)}</div>
-          </div>`;
-        grid.appendChild(card);
-      });
-    }
-
-    function closeResults() {
-      if (searchCtl) searchCtl.abort();
-      $('resultsView').style.display = 'none';
-      try { history.replaceState(null, '', location.pathname); } catch {}
-    }
-
-    // Navegación con flechas (control remoto de Smart TV)
-    function moveFocus(e) {
-      const cards = [...$('resultsContent').querySelectorAll('.result-card')];
-      const i = cards.indexOf(document.activeElement);
-      if (i < 0) return;
-      const cols = cards.filter(c => c.offsetTop === cards[0].offsetTop).length || 1;
-      const delta = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
-      if (!delta) return;
-      e.preventDefault();
-      const next = cards[i + delta];
-      if (next) next.focus();
-      else if (e.key === 'ArrowUp') $('searchInput').focus();
-    }
-
-    // ---------- Detalle ----------
-    let lastFocus = null;
-    const KIND_LABEL = { flatrate: 'Suscripción', free: 'Gratis', ads: 'Gratis con anuncios', rent: 'Alquiler', buy: 'Compra' };
-
-    function closeDetails() {
-      $('detailModal').style.display = 'none';
-      if (lastFocus) lastFocus.focus();
-    }
-
-    async function openDetails(it) {
-      lastFocus = document.activeElement;
-      const modal = $('detailModal'), body = $('detailBody');
-      const poster = it.poster ? `<img class="d-poster" src="${esc(it.poster)}" alt="">` : `<div class="d-poster"></div>`;
-      body.innerHTML = `
-        <button class="btn-action close" id="detailClose" tabindex="0">✕</button>
-        ${poster}
-        <div style="flex:1; min-width:0;">
-          <h3>${esc(it.title)}</h3>
-          <div class="facts">${esc(TYPE_LABEL[it.type] || '')}${it.year ? ' · ' + esc(it.year) : ''}${it.rating ? ' · ★ ' + it.rating.toFixed(1) : ''}</div>
-          <p class="ov">${esc(it.overview || '')}</p>
-          <div id="detailExtra" style="color:var(--text-muted)">Cargando disponibilidad...</div>
-        </div>`;
-      modal.style.display = 'flex';
-      $('detailClose').onclick = closeDetails;
-      $('detailClose').focus();
-
-      try {
-        const d = await api('/api/title', { type: it.type, id: it.id });
-        const extra = $('detailExtra');
-        if (!extra || modal.style.display !== 'flex') return;
-        const facts = [TYPE_LABEL[d.type], d.year, d.runtime ? d.runtime + ' min' : '', d.seasons ? d.seasons + ' temporada' + (d.seasons > 1 ? 's' : '') : '', (d.genres || []).join(', ')].filter(Boolean).join(' · ');
-        const q = encodeURIComponent(`${d.title} ${d.year || ''}`.trim());
-        const groups = {};
-        (d.providers || []).forEach(p => (groups[p.kind] = groups[p.kind] || []).push(p));
-        const provHtml = Object.keys(KIND_LABEL).filter(k => groups[k]).map(k => `
-          <h4>${KIND_LABEL[k]}</h4>
-          <div class="prov-list">${groups[k].map(p => `<span class="prov">${p.logo ? `<img src="${esc(p.logo)}" alt="">` : ''}${esc(p.name)}</span>`).join('')}</div>`).join('');
-        extra.style.color = 'inherit';
-        extra.innerHTML = `
-          ${d.tagline ? `<div class="tagline">${esc(d.tagline)}</div>` : ''}
-          <div class="facts">${esc(facts)}</div>
-          ${provHtml || `<div style="color:var(--text-muted)">Sin información de plataformas para ${esc(d.country)}.</div>`}
-          <div class="detail-actions">
-            ${d.trailer ? `<a class="btn-action" tabindex="0" href="${esc(safeUrl(d.trailer))}" target="_blank" rel="noopener noreferrer">▶ Ver tráiler</a>` : `<a class="btn-action" tabindex="0" href="https://www.youtube.com/results?search_query=${q}+trailer" target="_blank" rel="noopener noreferrer">▶ Buscar tráiler</a>`}
-            ${d.watchLink ? `<a class="btn-action" tabindex="0" href="${esc(safeUrl(d.watchLink))}" target="_blank" rel="noopener noreferrer">Dónde ver</a>` : ''}
-          </div>`;
-      } catch (err) {
-        const extra = $('detailExtra');
-        if (extra) extra.textContent = 'No se pudo cargar la disponibilidad: ' + err.message;
-      }
-    }
+    const writeApps = apps => {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(apps)); } catch {}
+    };
 
     function openModal(index = null) {
       editIndex = index;
-      const modal = document.getElementById('addModal');
-      const title = document.getElementById('modalTitle');
-      const nameInput = document.getElementById('appName');
-      const urlInput = document.getElementById('appUrl');
-      const catSelect = document.getElementById('appCategory');
-
-      if (index !== null) {
-        const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
-        title.textContent = "Editar Canal";
-        nameInput.value = saved[index].name;
-        urlInput.value = saved[index].url;
-        catSelect.value = saved[index].category || 'personal';
+      const saved = readApps();
+      if (index !== null && saved[index]) {
+        $('modalTitle').textContent = "Editar Canal";
+        $('appName').value = saved[index].name;
+        $('appUrl').value = saved[index].url;
+        $('appCategory').value = saved[index].category || 'personal';
       } else {
-        title.textContent = "Añadir Nuevo Canal";
-        nameInput.value = "";
-        urlInput.value = "";
-        catSelect.value = 'personal';
+        $('modalTitle').textContent = "Añadir Nuevo Canal";
+        $('appName').value = "";
+        $('appUrl').value = "";
+        $('appCategory').value = 'personal';
       }
-
-      modal.style.display = 'flex';
+      $('addModal').style.display = 'flex';
     }
 
-    function closeModal() { document.getElementById('addModal').style.display = 'none'; }
+    function closeModal() { $('addModal').style.display = 'none'; }
 
     function loadCustomApps() {
-      const container = document.getElementById('appsContainer');
-      const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
-
-      saved.forEach((app, index) => {
+      const container = $('appsContainer');
+      readApps().forEach((app, index) => {
         let domain = "google.com";
         try { domain = new URL(app.url).hostname; } catch(e){}
 
@@ -983,62 +479,32 @@
     }
 
     function saveShortcut() {
-      const name = document.getElementById('appName').value.trim();
-      let url = document.getElementById('appUrl').value.trim();
-      const category = document.getElementById('appCategory').value;
+      const name = $('appName').value.trim();
+      let url = $('appUrl').value.trim();
+      const category = $('appCategory').value;
       if (!name || !url) return;
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
       if (safeUrl(url) === '#') { alert('La URL no es válida'); return; }
 
-      const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
-
+      const saved = readApps();
       if (editIndex !== null) {
         saved[editIndex] = { name, url, category };
       } else {
         saved.push({ name, url, category });
       }
-
-      localStorage.setItem('custom_tv_apps', JSON.stringify(saved));
+      writeApps(saved);
       closeModal();
       location.reload();
     }
 
     function deleteShortcut(index) {
-      const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
+      const saved = readApps();
       saved.splice(index, 1);
-      localStorage.setItem('custom_tv_apps', JSON.stringify(saved));
+      writeApps(saved);
       location.reload();
     }
 
     loadCustomApps();
-
-    // ---------- Eventos ----------
-    const input = $('searchInput');
-    input.addEventListener('input', onInput);
-    input.addEventListener('focus', () => { if (!input.value.trim()) renderSuggest(); });
-    input.addEventListener('blur', () => setTimeout(hideSuggest, 120));
-    input.addEventListener('keydown', e => {
-      const open = $('suggestBox').style.display === 'block';
-      if (e.key === 'ArrowDown') {
-        if (open) { e.preventDefault(); moveSuggest(1); }
-        else { const c = $('resultsContent').querySelector('.result-card'); if (c) { e.preventDefault(); c.focus(); } }
-      } else if (e.key === 'ArrowUp' && open) { e.preventDefault(); moveSuggest(-1); }
-      else if (e.key === 'Enter') {
-        if (open && activeSuggest >= 0) { e.preventDefault(); pickSuggest(activeSuggest); }
-        else runSearch();
-      } else if (e.key === 'Escape') hideSuggest();
-    });
-    $('searchBtn').addEventListener('click', runSearch);
-    $('closeResultsBtn').addEventListener('click', closeResults);
-    $('sortSelect').addEventListener('change', e => { currentSort = e.target.value; renderResults(); });
-    $('resultsContent').addEventListener('keydown', moveFocus);
-    $('detailModal').addEventListener('click', e => { if (e.target === $('detailModal')) closeDetails(); });
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && $('detailModal').style.display === 'flex') closeDetails();
-    });
-
-    const initialQ = new URLSearchParams(location.search).get('q');
-    if (initialQ) { input.value = initialQ; runSearch(); }
   </script>
 </body>
 </html>

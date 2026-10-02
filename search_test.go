@@ -1,9 +1,11 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -547,6 +549,76 @@ func TestHandlers(t *testing.T) {
 	searchHandler(rec, httptest.NewRequest("OPTIONS", "/api/search?q=batman", nil))
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("OPTIONS: %d", rec.Code)
+	}
+}
+
+// TestCompressGzipYDocsPages evita el fallo más caro del proyecto: comprimir la
+// respuesta sin mandar Content-Encoding hacía que el navegador viera binario gzip
+// en lugar del HTML.
+func TestCompressGzipYDocsPages(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/catalogo", pageHandler("/catalogo", "catalog.html"))
+	mux.HandleFunc("/", homeHandler)
+	h := compress(mux)
+
+	for _, path := range []string{"/", "/catalogo"} {
+		// Sin gzip: HTML plano.
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "<!DOCTYPE html>") {
+			t.Fatalf("%s sin gzip: %d %q", path, rec.Code, rec.Body.String())
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+			t.Fatalf("%s Content-Type: %q", path, ct)
+		}
+
+		// Con gzip: cabecera presente y cuerpo que descomprime al mismo HTML.
+		req := httptest.NewRequest("GET", path, nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec = httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if got := rec.Header().Get("Content-Encoding"); got != "gzip" {
+			t.Fatalf("%s Content-Encoding: %q", path, got)
+		}
+		if !strings.Contains(rec.Header().Get("Vary"), "Accept-Encoding") {
+			t.Fatalf("%s sin Vary: Accept-Encoding", path)
+		}
+		zr, err := gzip.NewReader(rec.Body)
+		if err != nil {
+			t.Fatalf("%s gzip ilegible: %v", path, err)
+		}
+		plain, err := io.ReadAll(zr)
+		if err != nil {
+			t.Fatalf("%s no se descomprime: %v", path, err)
+		}
+		if !strings.Contains(string(plain), "<!DOCTYPE html>") {
+			t.Fatalf("%s HTML comprimido ilegible: %q", path, string(plain[:60]))
+		}
+	}
+
+	// HEAD no debe comprimirse.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("HEAD", "/", nil))
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("HEAD comprimido: %q", got)
+	}
+}
+
+// TestPagesEnlazadas verifica que el launcher y el catálogo se alcanzan entre sí.
+func TestPagesEnlazadas(t *testing.T) {
+	page := func(path, name string) string {
+		b, err := site.ReadFile(name)
+		if err != nil {
+			t.Fatalf("falta %s: %v", name, err)
+		}
+		return string(b)
+	}
+	home, cat := page("index.html", "index.html"), page("catalog.html", "catalog.html")
+	if !strings.Contains(home, `href="/catalogo"`) {
+		t.Fatal("index.html no enlaza al catálogo")
+	}
+	if !strings.Contains(cat, `href="/"`) {
+		t.Fatal("catalog.html no vuelve al launcher")
 	}
 }
 

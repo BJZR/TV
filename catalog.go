@@ -477,16 +477,20 @@ func (b browse) load(ctx context.Context) (*BrowseResponse, error) {
 	if b.Type == "all" {
 		types = []string{"movie", "tv"}
 	}
+	type hit struct {
+		typ  string
+		page tmdbPage
+	}
 	var (
-		mu    sync.Mutex
-		pages []tmdbPage
-		errs  []error
-		wg    sync.WaitGroup
+		mu   sync.Mutex
+		got  []hit
+		errs []error
+		wg   sync.WaitGroup
 	)
 	for _, t := range types {
 		path, params := b.endpoint(t)
 		wg.Add(1)
-		go func(path string, params url.Values) {
+		go func(typ, path string, params url.Values) {
 			defer wg.Done()
 			var out tmdbPage
 			if err := tmdbGet(ctx, path, params, &out); err != nil {
@@ -496,27 +500,27 @@ func (b browse) load(ctx context.Context) (*BrowseResponse, error) {
 				return
 			}
 			mu.Lock()
-			pages = append(pages, out)
+			got = append(got, hit{typ, out})
 			mu.Unlock()
-		}(path, params)
+		}(t, path, params)
 	}
 	wg.Wait()
 
 	resp := &BrowseResponse{Items: []Card{}, Page: b.Page, Pages: 1, Type: b.Type, Sort: b.Sort, Genre: b.Genre, Year: b.Year}
-	if len(pages) == 0 {
+	if len(got) == 0 {
 		if len(errs) > 0 {
 			return nil, errs[0]
 		}
 		return resp, nil
 	}
 
-	cols := make([][]Card, 0, len(pages))
-	for _, pg := range pages {
-		cols = append(cols, toCards(pg.Results, g, b.Type, b.Backdrops))
-		if pg.TotalPages > resp.Pages {
-			resp.Pages = pg.TotalPages
+	cols := make([][]Card, 0, len(got))
+	for _, h := range got {
+		cols = append(cols, toCards(h.page.Results, g, h.typ, b.Backdrops))
+		if h.page.TotalPages > resp.Pages {
+			resp.Pages = h.page.TotalPages
 		}
-		resp.Total += len(pg.Results)
+		resp.Total += len(h.page.Results)
 	}
 	if len(cols) == 1 {
 		resp.Items = cols[0]

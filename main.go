@@ -88,6 +88,9 @@ func compress(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		h := w.Header()
+		h.Set("Content-Encoding", "gzip")
+		h.Add("Vary", "Accept-Encoding")
 		zw := pool.Get().(*gzip.Writer)
 		zw.Reset(w)
 		defer func() {

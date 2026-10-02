@@ -535,11 +535,11 @@ function wireRail(key) {
   if (!row) return;
   const rail = $('.rail', row), l = $('.nav-b.l', row), r = $('.nav-b.r', row);
   const upd = () => {
-    l.toggleAttribute('disabled', rail.scrollLeft < 8);
-    r.toggleAttribute('disabled', rail.scrollLeft > rail.scrollWidth - rail.clientWidth - 8);
+    l?.toggleAttribute('disabled', rail.scrollLeft < 8);
+    r?.toggleAttribute('disabled', rail.scrollLeft > rail.scrollWidth - rail.clientWidth - 8);
   };
-  l.onclick = () => rail.scrollBy({ left: -rail.clientWidth * 0.82, behavior: 'smooth' });
-  r.onclick = () => rail.scrollBy({ left: rail.clientWidth * 0.82, behavior: 'smooth' });
+  if (l) l.onclick = () => rail.scrollBy({ left: -rail.clientWidth * 0.82, behavior: 'smooth' });
+  if (r) r.onclick = () => rail.scrollBy({ left: rail.clientWidth * 0.82, behavior: 'smooth' });
   rail.addEventListener('scroll', upd, { passive: true });
   rail.addEventListener('wheel', e => {
     if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
