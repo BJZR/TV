@@ -25,6 +25,7 @@ type Result struct {
 	Kind     string  `json:"kind"` // web | plataforma | video | info
 	Favicon  string  `json:"favicon,omitempty"`
 	Source   string  `json:"source"`
+	Votes    int     `json:"votes,omitempty"`
 	Score    float64 `json:"score"`
 	Match    float64 `json:"-"`
 }
@@ -35,6 +36,7 @@ type SearchResponse struct {
 	Results    []Result `json:"results"`
 	Suggestion string   `json:"suggestion,omitempty"`
 	Engine     string   `json:"engine,omitempty"`
+	Sources    []string `json:"sources,omitempty"`
 }
 
 // ---------- Caché LRU con TTL y respaldo de datos viejos ----------
@@ -138,9 +140,10 @@ func cacheFlush() {
 // ---------- Una sola petición por consulta a la vez ----------
 
 type call struct {
-	done chan struct{}
-	rs   []Result
-	err  error
+	done    chan struct{}
+	rs      []Result
+	sources []string
+	err     error
 }
 
 var (
@@ -149,15 +152,15 @@ var (
 )
 
 // fetchShared reutiliza el trabajo en curso de la misma consulta.
-func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([]Result, error)) ([]Result, error) {
+func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([]Result, []string, error)) ([]Result, []string, error) {
 	flightMu.Lock()
 	if c, ok := flights[key]; ok {
 		flightMu.Unlock()
 		select {
 		case <-c.done:
-			return c.rs, c.err
+			return c.rs, c.sources, c.err
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, nil, ctx.Err()
 		}
 	}
 	c := &call{done: make(chan struct{})}
@@ -167,14 +170,14 @@ func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([
 	// El trabajo no depende del cliente que llegó primero: si se va, los demás
 	// siguen esperando el mismo resultado.
 	fctx, cancel := context.WithTimeout(context.Background(), requestTimout)
-	c.rs, c.err = fetch(fctx)
+	c.rs, c.sources, c.err = fetch(fctx)
 	cancel()
 	close(c.done)
 
 	flightMu.Lock()
 	delete(flights, key)
 	flightMu.Unlock()
-	return c.rs, c.err
+	return c.rs, c.sources, c.err
 }
 
 // ---------- Búsqueda ----------
@@ -188,39 +191,40 @@ func cacheKey(p parsed) string {
 }
 
 // results busca en la web con caché y peticiones agrupadas.
-func results(ctx context.Context, p parsed) ([]Result, error) {
+func results(ctx context.Context, p parsed) ([]Result, []string, error) {
 	key := cacheKey(p)
 	if rs, ok := cacheGet(key, true); ok {
-		return rs, nil
+		return rs, nil, nil
 	}
-	rs, err := fetchShared(ctx, key, func(ctx context.Context) ([]Result, error) {
-		return searchWeb(ctx, p)
+	rs, sources, err := fetchShared(ctx, key, func(ctx context.Context) ([]Result, []string, error) {
+		return searchAll(ctx, p)
 	})
 	if err == nil {
 		ttl := cacheTTL
 		if len(rs) == 0 {
-			ttl = cacheNegTTL // no castigar al buscador por consultas sin resultados
+			ttl = cacheNegTTL // no castigar a los buscadores por consultas sin resultados
 		}
 		cacheSet(key, rs, ttl, false)
-		return rs, nil
+		return rs, sources, nil
 	}
 	if stale, ok := cacheStale(key); ok {
-		return stale, nil
+		return stale, nil, nil
 	}
-	return nil, err
+	return nil, nil, err
 }
 
 func runSearch(ctx context.Context, rawQuery string, limit int) (*SearchResponse, error) {
 	p := parseQuery(rawQuery)
-	resp := &SearchResponse{Query: p.Query, Engine: "DuckDuckGo", Results: []Result{}}
+	resp := &SearchResponse{Query: p.Query, Engine: "web abierta", Results: []Result{}}
 	if !p.valid() {
 		return resp, nil
 	}
 
-	rs, err := results(ctx, p)
+	rs, sources, err := results(ctx, p)
 	if err != nil {
 		return nil, err
 	}
+	resp.Sources = sources
 	ranked := rankResults(rs, p)
 
 	resp.Total = len(ranked)
@@ -301,7 +305,7 @@ func suggestHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimout)
 	defer cancel()
 
-	out, err := suggestWeb(ctx, q)
+	out, err := suggestAll(ctx, q)
 	if err != nil && len(out) == 0 {
 		writeErr(w, err)
 		return

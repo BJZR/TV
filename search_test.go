@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,19 @@ import (
 	"testing"
 	"time"
 )
+
+// La página de resultados tiene que decir de dónde salieron los enlaces.
+func TestLaPaginaDiceLosIndices(t *testing.T) {
+	page, err := site.ReadFile("catalog.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`id="srcs"`, "data.sources.join"} {
+		if !strings.Contains(string(page), want) {
+			t.Errorf("catalog.html no muestra los índices: falta %q", want)
+		}
+	}
+}
 
 // ---------- Utilidades de texto ----------
 
@@ -373,21 +387,21 @@ func TestCacheEviction(t *testing.T) {
 func TestFetchSharedAgrupaPeticiones(t *testing.T) {
 	var calls int
 	var mu sync.Mutex
-	fetch := func(ctx context.Context) ([]Result, error) {
+	fetch := func(ctx context.Context) ([]Result, []string, error) {
 		mu.Lock()
 		calls++
 		mu.Unlock()
 		time.Sleep(30 * time.Millisecond)
-		return []Result{{Title: "única"}}, nil
+		return []Result{{Title: "única"}}, []string{"Falso"}, nil
 	}
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			rs, err := fetchShared(context.Background(), "compartida", fetch)
-			if err != nil || len(rs) != 1 {
-				t.Errorf("resultado inesperado: %+v %v", rs, err)
+			rs, sources, err := fetchShared(context.Background(), "compartida", fetch)
+			if err != nil || len(rs) != 1 || len(sources) != 1 {
+				t.Errorf("resultado inesperado: %+v %v %v", rs, sources, err)
 			}
 		}()
 	}
@@ -399,29 +413,47 @@ func TestFetchSharedAgrupaPeticiones(t *testing.T) {
 
 // ---------- Servidor falso del buscador ----------
 
-// fakeEngine imitates el buscador: devuelve el HTML de ejemplo y cuenta las
-// consultas que recibió.
+// fakeEngine imitates todos los índices: sirve el HTML de ejemplo en cada uno de
+// sus endpoints y cuenta las consultas que recibió.
 type fakeEngine struct {
 	srv     *httptest.Server
 	queries []string
 	mu      sync.Mutex
 	fail    bool
+	extra   map[string]string // endpoint -> cuerpo con el que responder
+	status  map[string]int    // endpoint -> estado con el que responder
 }
 
 func newFakeEngine(t *testing.T, htmlBody, suggestBody string) *fakeEngine {
 	t.Helper()
-	f := &fakeEngine{}
+	f := &fakeEngine{
+		extra:  map[string]string{"/wiki": `{}`, "/archive": `{}`, "/wiby": ``},
+		status: map[string]int{},
+	}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
-		f.queries = append(f.queries, r.URL.Query().Get("q"))
-		fail := f.fail
+		// Solo se cuentan las consultas del buscador principal: las de los otros
+		// índices usan parámetros distintos y llegarían en cualquier orden.
+		if r.URL.Path == "/html" || r.URL.Path == "/lite" {
+			f.queries = append(f.queries, r.URL.Query().Get("q"))
+		}
+		fail, extra, status := f.fail, f.extra, f.status
 		f.mu.Unlock()
+		if code, bad := status[r.URL.Path]; bad {
+			w.WriteHeader(code)
+			return
+		}
 		if fail {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		if body, ok := extra[r.URL.Path]; ok {
+			w.Header().Set("Content-Type", "application/json")
+			io.WriteString(w, body)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html")
-		if strings.Contains(r.URL.Path, "ac") {
+		if strings.Contains(r.URL.Path, "ac") || strings.Contains(r.URL.Path, "sug") {
 			w.Header().Set("Content-Type", "application/json")
 			io.WriteString(w, suggestBody)
 			return
@@ -432,12 +464,43 @@ func newFakeEngine(t *testing.T, htmlBody, suggestBody string) *fakeEngine {
 	return f
 }
 
+// serve hace que un endpoint devuelva un cuerpo concreto en las pruebas.
+func (f *fakeEngine) serve(path, body string) {
+	f.mu.Lock()
+	f.extra[path] = body
+	f.mu.Unlock()
+}
+
+// failPath hace que un endpoint conteste con un error, para comprobar que un
+// índice caído no tira abajo la búsqueda entera.
+func (f *fakeEngine) failPath(path string) {
+	f.mu.Lock()
+	f.status[path] = http.StatusForbidden
+	f.mu.Unlock()
+}
+
+// point apunta todos los índices al servidor falso. Sin esto, Wikipedia,
+// Archive o las sugerencias se irían a internet de verdad desde los tests.
 func (f *fakeEngine) point(t *testing.T) {
 	t.Helper()
 	oldHTML, oldLite, oldSug := ddgHTML, ddgLite, ddgSuggest
+	oldWikiAPI, oldWikiSite, oldArchive, oldWiby := wikiAPI, wikiSite, archiveAPI, wibySearch
+	oldSources := suggestSources
+
 	ddgHTML, ddgLite, ddgSuggest = f.srv.URL+"/html", f.srv.URL+"/lite", f.srv.URL+"/ac"
+	wikiAPI, wikiSite = f.srv.URL+"/wiki", f.srv.URL+"/wiki/"
+	archiveAPI = f.srv.URL + "/archive"
+	wibySearch = f.srv.URL + "/wiby"
+	suggestSources = []suggestSource{
+		{"Falso", f.srv.URL + "/sug/uno?q=%s"},
+		{"Otro", f.srv.URL + "/sug/dos?q=%s"},
+	}
 	cacheFlush()
-	t.Cleanup(func() { ddgHTML, ddgLite, ddgSuggest = oldHTML, oldLite, oldSug })
+	t.Cleanup(func() {
+		ddgHTML, ddgLite, ddgSuggest = oldHTML, oldLite, oldSug
+		wikiAPI, wikiSite, archiveAPI, wibySearch = oldWikiAPI, oldWikiSite, oldArchive, oldWiby
+		suggestSources = oldSources
+	})
 }
 
 func TestSearchHandlerDevuelveResultados(t *testing.T) {
@@ -768,5 +831,269 @@ func TestIndexTieneElBuscador(t *testing.T) {
 	}
 	if !strings.Contains(string(cat), "/api/search") {
 		t.Error("catalog.html debe pedir resultados a /api/search")
+	}
+}
+
+// ---------- Varios índices a la vez ----------
+
+func TestSearchAllConsultaCadaIndice(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.serve("/wiki", `{"query":{"search":[{"title":"Matrix","snippet":"película de <b>1999</b>"}]}}`)
+	f.serve("/archive", `{"response":{"docs":[{"identifier":"matrix-1999","title":"The Matrix","year":1999}]}}`)
+	f.serve("/wiby", `<blockquote><a class="tlink" href="https://viejo.example/matrix">Matrix vieja</a><p class="url">x</p><p>La Matrix de 1999</p></blockquote>`)
+	f.point(t)
+
+	rs, sources, err := searchAll(context.Background(), parseQuery("matrix"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"DuckDuckGo", "Wikipedia", "Internet Archive", "Wiby"} {
+		if !contains(sources, want) {
+			t.Errorf("faltó el índice %s en %+v", want, sources)
+		}
+	}
+	var archive, wiki, wiby bool
+	for _, r := range rs {
+		switch r.Source {
+		case "Internet Archive":
+			archive = r.URL == "https://archive.org/details/matrix-1999" && r.Year == "1999"
+		case "Wikipedia":
+			wiki = strings.Contains(r.Snippet, "1999") // el HTML del resumen se limpia
+		case "Wiby":
+			wiby = r.Host == "viejo.example"
+		}
+	}
+	if !archive {
+		t.Error("el resultado del archivo no tiene la URL ni el año esperados")
+	}
+	if !wiki {
+		t.Error("el resultado de Wikipedia no se limpió")
+	}
+	if !wiby {
+		t.Error("el resultado de Wiby no se leyó")
+	}
+}
+
+func TestSearchAllSigueSiUnIndiceFalla(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.failPath("/wiki")
+	f.failPath("/archive")
+	f.failPath("/wiby")
+	f.point(t)
+
+	rs, sources, err := searchAll(context.Background(), parseQuery("matrix"))
+	if err != nil || len(rs) == 0 {
+		t.Fatalf("un índice caído no puede tirar la búsqueda: %v", err)
+	}
+	if len(sources) != 1 || sources[0] != "DuckDuckGo" {
+		t.Errorf("índices = %+v", sources)
+	}
+}
+
+func TestSearchAllSinIndices(t *testing.T) {
+	f := newFakeEngine(t, ``, `[]`)
+	f.fail = true
+	f.point(t)
+	if _, _, err := searchAll(context.Background(), parseQuery("matrix")); !errors.Is(err, errNoEngine) {
+		t.Errorf("err = %v, quería errNoEngine", err)
+	}
+}
+
+// Un mismo título puede llevar a muchas películas: el año es lo que dice cuál.
+func TestSearchAllFiltraPorAño(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.serve("/archive", `{"response":{"docs":[
+		{"identifier":"reloaded","title":"The Matrix Reloaded","year":2003},
+		{"identifier":"matrix-1999","title":"The Matrix","year":1999}]}}`)
+	f.point(t)
+
+	rs, _, err := searchAll(context.Background(), parseQuery("matrix 1999"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ranked := rankResults(rs, parseQuery("matrix 1999"))
+	if len(ranked) == 0 {
+		t.Fatal("no quedó nada")
+	}
+	if !strings.Contains(ranked[0].Title, "Matrix") || ranked[0].Year != "1999" {
+		t.Errorf("primero = %+v", ranked[0])
+	}
+	for _, r := range ranked {
+		if r.Year == "2003" {
+			t.Errorf("se coló la película de otro año: %+v", r)
+		}
+	}
+}
+
+// ---------- Fusión ----------
+
+func TestVoteResultsCuentaElAcuerdo(t *testing.T) {
+	all := []Result{
+		{URL: "https://a.example/x", Title: "Matrix", Snippet: "corto"},
+		{URL: "https://a.example/x/", Title: "Matrix", Snippet: "resumen largo que gana"},
+		{URL: "https://b.example/y", Title: "Matrix"},
+		{URL: "https://c.example/z", Title: "Matrix"},
+	}
+	out := voteResults(all, nil)
+	if len(out) != 3 {
+		t.Fatalf("fusión = %d resultados, quería 3: %+v", len(out), out)
+	}
+	if out[0].Votes != 2 || out[2].Votes != 1 {
+		t.Errorf("votos = %d/%d/%d, querían 2/2/1", out[0].Votes, out[1].Votes, out[2].Votes)
+	}
+	if out[0].Snippet != "resumen largo que gana" {
+		t.Errorf("se perdió el mejor resumen: %q", out[0].Snippet)
+	}
+}
+
+func TestElAcuerdoSubeEnElOrden(t *testing.T) {
+	p := parseQuery("matrix")
+	plano := voteResults([]Result{
+		{URL: "https://a.example/1", Title: "The Matrix", Kind: "web", Host: "a.example"},
+	}, nil)
+	acuerdo := voteResults([]Result{
+		{URL: "https://a.example/1", Title: "The Matrix", Kind: "web", Host: "a.example"},
+		{URL: "https://a.example/1/", Title: "The Matrix", Kind: "web", Host: "a.example"},
+		{URL: "https://b.example/1", Title: "Matrix cosas", Kind: "web", Host: "b.example"},
+	}, nil)
+	r1 := rankResults(plano, p)
+	r2 := rankResults(acuerdo, p)
+	if len(r1) == 0 || len(r2) == 0 {
+		t.Fatal("faltan resultados")
+	}
+	if r2[0].Score <= r1[0].Score {
+		t.Errorf("el acuerdo no subió la puntuación: %.1f -> %.1f", r1[0].Score, r2[0].Score)
+	}
+}
+
+func TestCapHostsEvitaUnMonopolio(t *testing.T) {
+	rs := []Result{
+		{Host: "netflix.com"}, {Host: "netflix.com"}, {Host: "netflix.com"},
+		{Host: "primevideo.com"},
+	}
+	out := capHosts(rs)
+	var netflix int
+	for _, r := range out {
+		if r.Host == "netflix.com" {
+			netflix++
+		}
+	}
+	if netflix != maxPerHost || len(out) != maxPerHost+1 {
+		t.Errorf("quedaron %d de netflix y %d en total: %+v", netflix, len(out), out)
+	}
+}
+
+// El año del archivo llega a veces como número y a veces como texto.
+func TestAnioDelArchivoEnCualquierFormato(t *testing.T) {
+	for _, body := range []string{
+		`{"response":{"docs":[{"identifier":"a","title":"T","year":1999}]}}`,
+		`{"response":{"docs":[{"identifier":"a","title":"T","year":"1999"}]}}`,
+	} {
+		f := newFakeEngine(t, ``, `[]`)
+		f.serve("/archive", body)
+		f.point(t)
+		rs, err := archiveSource(context.Background(), []string{"t"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rs) != 1 || rs[0].Year != "1999" {
+			t.Errorf("año = %+v", rs)
+		}
+	}
+}
+
+// ---------- Sugerencias de todos los buscadores ----------
+
+func TestSuggestAllMezclaBuscadores(t *testing.T) {
+	f := newFakeEngine(t, ``, `[{"phrase":"matrix"},{"phrase":"matrix 2"}]`)
+	f.serve("/sug/dos", `{"r":[{"k":"matrix reloaded"},{"k":"matrix 3"}]}`)
+	f.point(t)
+
+	got, err := suggestAll(context.Background(), "matr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 {
+		t.Fatalf("sugerencias = %+v", got)
+	}
+	// "matrix" lo proponen los dos buscadores, así que va primero.
+	if got[0] != "matrix" {
+		t.Errorf("primera = %q, quería la que más buscadores proponen: %+v", got[0], got)
+	}
+	for _, s := range got {
+		if strings.EqualFold(s, "matrix") {
+			continue
+		}
+		if !strings.HasPrefix(strings.ToLower(s), "matr") {
+			t.Errorf("sugerencia rara: %q", s)
+		}
+	}
+}
+
+func TestSuggestAllFiltraCirilico(t *testing.T) {
+	f := newFakeEngine(t, ``, `[{"phrase":"matrix 1999"}]`)
+	f.serve("/sug/dos", `[{"phrase":"matrix фильм смотреть"}]`)
+	f.point(t)
+
+	got, err := suggestAll(context.Background(), "matrix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range got {
+		if reCyrillic.MatchString(s) {
+			t.Errorf("se coló una sugerencias en ruso: %+v", got)
+		}
+	}
+	if len(got) != 1 || got[0] != "matrix 1999" {
+		t.Errorf("sugerencias = %+v", got)
+	}
+}
+
+func contains(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSuggestAllDescartaLoQueNoTieneQueVer(t *testing.T) {
+	f := newFakeEngine(t, ``, `[{"phrase":"matrix 1999"},{"phrase":"receta de gazpacho"}]`)
+	f.point(t)
+
+	got, err := suggestAll(context.Background(), "matr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range got {
+		if strings.Contains(s, "gazpacho") {
+			t.Errorf("se coló una sugerencia que no empieza por lo tecleado: %+v", got)
+		}
+	}
+	if len(got) != 1 {
+		t.Errorf("sugerencias = %+v", got)
+	}
+}
+
+func TestLooksBlocked(t *testing.T) {
+	for _, body := range []string{
+		`<p>Unfortunately, bots use DuckDuckGo too. Please complete the following challenge ` +
+			`to confirm this search was made by a human. Select all squares containing a duck:</p>`,
+		`<div>bots use duckduckgo too</div>`,
+	} {
+		if !looksBlocked(body) {
+			t.Errorf("no reconoció el bloqueo: %q", body)
+		}
+	}
+	// "captcha" y "anomaly" salen en títulos de películas de verdad, así que por sí
+	// solos no pueden marcar una respuesta como bloqueo.
+	for _, body := range []string{
+		`<a class="result__a" href="/x">El Enigma de la captcha</a>`,
+		`<a class="result__a" href="/y">Anomaly (2022)</a>`,
+	} {
+		if looksBlocked(body) {
+			t.Errorf("falso positivo con %q", body)
+		}
 	}
 }

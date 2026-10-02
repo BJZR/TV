@@ -261,46 +261,38 @@ func fetchHTML(ctx context.Context, endpoint, query string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// El buscador contesta con un 202 y una página de "anomaly" cuando decide
+	// que le llegan demasiadas peticiones. No es una respuesta vacía: es un
+	// portazo, y conviene notarlo para no pedirle la variante lite encima.
+	if looksBlocked(string(b)) {
+		return "", errNoEngine
+	}
 	return string(b), nil
 }
 
-var client = &http.Client{Timeout: webTimeout}
-
-// searchWeb busca en la web y devuelve las páginas donde aparece la película.
-// Prueba la consulta limpia y, si hace falta, variantes para encontrar enlaces
-// de reproducción.
-func searchWeb(ctx context.Context, p parsed) ([]Result, error) {
-	queries := p.webQueries()
-	var (
-		all  []Result
-		last error
-	)
-	for _, q := range queries {
-		body, err := fetchHTML(ctx, ddgHTML, q)
-		if err != nil {
-			last = err
-			// El buscador principal puede responder con un captcha: el modo
-			// "lite" es másSimple y suele escapar.
-			body, err = fetchHTML(ctx, ddgLite, q)
-			if err != nil {
-				last = err
-				continue
-			}
-		}
-		hits := parseHits(body)
-		if len(hits) == 0 {
-			continue
-		}
-		all = append(all, hits...)
-		if len(all) >= maxHits {
-			break
-		}
-	}
-	if len(all) == 0 && last != nil {
-		return nil, last
-	}
-	return mergeResults(all), nil
+// looksBlocked detecta el desafío con el que el buscador rechaza al visitante.
+// Son las frases literales de su página de captcha: "captcha" a secas
+// Appearance sí aparece en títulos de películas y daría falsos positivos.
+var blockMarkers = []string{
+	"confirm this search was made by a human",
+	"bots use duckduckgo too",
 }
+
+func looksBlocked(body string) bool {
+	head := body
+	if len(head) > 4000 {
+		head = head[:4000]
+	}
+	low := strings.ToLower(head)
+	for _, mark := range blockMarkers {
+		if strings.Contains(low, mark) {
+			return true
+		}
+	}
+	return false
+}
+
+var client = &http.Client{Timeout: webTimeout}
 
 // reLocale quita el prefijo de país de una ruta: justwatch.com/mx/pelicula/x y
 // justwatch.com/es/pelicula/x son la misma película.
@@ -309,7 +301,8 @@ var reLocale = regexp.MustCompile(`^/[a-z]{2}(/|$)`)
 // samePage decide si dos URL apuntan a la misma página aunque cambien el
 // idioma o el país.
 func samePage(a, b string) bool {
-	if a == b {
+	// "https://x/pelicula" y "https://x/pelicula/" son la misma página.
+	if a, b = strings.TrimSuffix(a, "/"), strings.TrimSuffix(b, "/"); a == b && a != "" {
 		return true
 	}
 	ua, ub := a, b
@@ -343,20 +336,6 @@ func mergeResults(all []Result) []Result {
 }
 
 // ---------- Sugerencias ----------
-
-// suggestWeb pide al buscador lo que la gente suele escribir a partir de lo
-// tecleado. Solo devuelve texto, sin HTML.
-func suggestWeb(ctx context.Context, q string) ([]string, error) {
-	body, err := fetchHTML(ctx, ddgSuggest, q)
-	if err != nil {
-		return nil, err
-	}
-	out := parseSuggestions(body, suggestLimit)
-	if len(out) == 0 {
-		return nil, errNoEngine
-	}
-	return out, nil
-}
 
 // parseSuggestions acepta los dos formatos que contesta el buscador: una lista
 // de objetos {"phrase": "..."} y la versión agrupada ["consulta", ["matrix", ...]].
@@ -426,6 +405,30 @@ func snippetBonus(r Result) float64 {
 	return 0
 }
 
+// voteBonus sube lo que varios índices señalan a la vez: si dos rastreos
+// independientes están de acuerdo, esa página es la que se busca.
+func voteBonus(r Result) float64 {
+	if r.Votes <= 1 {
+		return 0
+	}
+	return float64(r.Votes-1) * votePoints
+}
+
+// capHosts deja como mucho maxPerHost resultados de una misma web. Sin esto,
+// las plataformas grandes se llevan la pantalla entera y no se ve nada más.
+func capHosts(rs []Result) []Result {
+	count := map[string]int{}
+	out := make([]Result, 0, len(rs))
+	for _, r := range rs {
+		if count[r.Host] >= maxPerHost {
+			continue
+		}
+		count[r.Host]++
+		out = append(out, r)
+	}
+	return out
+}
+
 // minMatch descarta las páginas que no hablan de la película buscada. Por
 // debajo de esto es ruido del buscador, aunque el título coincida en un detalle.
 const minMatch = 45
@@ -444,11 +447,11 @@ func scoreResult(r Result, p parsed) float64 {
 		}
 		switch {
 		case year == "":
-			base -= 4
+			base -= 4 // sin año no se sabe si es esta
 		case year == p.Year:
 			base += 16
 		default:
-			base -= 6
+			base -= 40 // es otra película: "matrix 1999" no es "Reloaded"
 		}
 	}
 	return math.Max(0, math.Min(100, base))
@@ -459,17 +462,24 @@ func scoreResult(r Result, p parsed) float64 {
 func rankResults(rs []Result, p parsed) []Result {
 	out := make([]Result, 0, len(rs))
 	for _, r := range rs {
+		// Si el año va en el título y no es el pedido, es otra película con el
+		// mismo nombre: "matrix 1999" no debe traer "The Matrix Reloaded".
+		if p.Year != "" {
+			if y := reYear.FindString(r.Title); y != "" && y != p.Year {
+				continue
+			}
+		}
 		r.Match = scoreResult(r, p)
 		if r.Match < minMatch {
 			continue // no es la película buscada
 		}
 		// El tope es 140 y no 100 a propósito: si no, todo lo que coincide con
 		// el título empata a 100 y el orden deja de significar nada.
-		r.Score = math.Round(math.Min(140, r.Match+platformBonus(r)+snippetBonus(r))*10) / 10
+		r.Score = math.Round(math.Min(160, r.Match+platformBonus(r)+snippetBonus(r)+voteBonus(r))*10) / 10
 		out = append(out, r)
 	}
 	sortResults(out)
-	return out
+	return capHosts(out)
 }
 
 // sortResults ordena por puntuación y, a igualdad, por título para que sea

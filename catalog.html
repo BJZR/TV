@@ -95,6 +95,7 @@
     .head h1 { font-size: clamp(1.25rem, 3vw, 1.7rem); letter-spacing: -.4px; }
     .head h1 b { color: var(--acc); }
     .count { color: var(--muted); font-size: .9rem; }
+    .srcs { color: var(--muted); font-size: .82rem; margin-top: .15rem; }
 
     .tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
     .tab {
@@ -222,6 +223,7 @@
     <div class="head">
       <h1 id="title">Resultados</h1>
       <span class="count" id="count"></span>
+      <span class="srcs" id="srcs"></span>
     </div>
 
     <nav class="tabs" id="tabs">
@@ -258,7 +260,7 @@
     })();
 
     const TAGS = { plataforma: 'plataforma', video: 'video', info: 'info', web: 'web' };
-    const list = $('#list'), state = $('#state'), title = $('#title'), count = $('#count');
+    const list = $('#list'), state = $('#state'), title = $('#title'), count = $('#count'), srcs = $('#srcs');
 
     let query = new URLSearchParams(location.search).get('q') || '';
     let all = [], filter = 'all', token = 0;
@@ -273,6 +275,7 @@
         all = [];
         title.textContent = 'Resultados';
         count.textContent = '';
+        srcs.textContent = '';
         list.innerHTML = '';
         say('<b>Escribe el nombre de una película</b>Arriba tienes el buscador. Escribe el título y te digo dónde verla.');
         return;
@@ -305,6 +308,9 @@
     function render() {
       const rs = visible();
       count.textContent = all.length ? rs.length + ' de ' + all.length : '';
+      srcs.textContent = (data.sources && data.sources.length > 1)
+        ? 'Buscado en ' + data.sources.join(', ') + '. Si varios índices lo señalan, más seguro.'
+        : '';
       if (!all.length) {
         list.innerHTML = '';
         say('<b>Nada por ahora</b>Prueba con el título en el idioma original, o sin el año.');
