@@ -394,6 +394,19 @@
     const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : "#"; } catch { return "#"; } };
     const STORAGE_KEY = 'custom_tv_apps';
 
+    // El catálogo vive en /catalogo cuando lo sirve el binario de Go. Si la
+    // página se abre como archivo suelto o en un hosting estático, esa ruta
+    // daría 404, así que se cae al archivo real.
+    (function () {
+      const link = document.querySelector('.goto-cat');
+      if (!link) return;
+      const fallback = () => { link.href = 'catalog.html'; };
+      if (location.protocol === 'file:') return fallback();
+      fetch('/catalogo', { method: 'HEAD' })
+        .then(r => { if (!r.ok) fallback(); })
+        .catch(fallback);
+    })();
+
     function updateClock() {
       const now = new Date();
       $('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

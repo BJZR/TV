@@ -30,6 +30,7 @@ func main() {
 	mux.HandleFunc("/api/featured", featuredHandler)
 	mux.HandleFunc("/api/similar", similarHandler)
 	mux.HandleFunc("/catalogo", pageHandler("/catalogo", "catalog.html"))
+	mux.HandleFunc("/catalogo/", pageHandler("/catalogo", "catalog.html"))
 	mux.HandleFunc("/", homeHandler)
 
 	srv := &http.Server{

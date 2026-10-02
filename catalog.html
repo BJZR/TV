@@ -359,6 +359,18 @@ const TYPE = { movie: 'Película', tv: 'Serie' };
 const KIND = { flatrate: 'Suscripción', free: 'Gratis', ads: 'Con anuncios', rent: 'Alquiler', buy: 'Compra' };
 const SORTS = [['trending', 'Tendencias'], ['popular', 'Populares'], ['top', 'Mejor valoradas'], ['new', 'Estrenos'], ['free', 'Gratis']];
 
+// El launcher vive en / cuando lo sirve el binario de Go. Sin él (archivo
+// suelto u hosting estático) se cae al index.html para no dejar un 404.
+(function () {
+  const link = $('.exit');
+  if (!link) return;
+  const fallback = () => { link.href = 'index.html'; };
+  if (location.protocol === 'file:') return fallback();
+  fetch('/', { method: 'HEAD' })
+    .then(r => { if (!r.ok) fallback(); })
+    .catch(fallback);
+})();
+
 async function api(path, params) {
   const qs = params ? '?' + new URLSearchParams(params) : '';
   const res = await fetch(path + qs, { headers: { Accept: 'application/json' } });

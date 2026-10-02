@@ -606,19 +606,35 @@ func TestCompressGzipYDocsPages(t *testing.T) {
 
 // TestPagesEnlazadas verifica que el launcher y el catálogo se alcanzan entre sí.
 func TestPagesEnlazadas(t *testing.T) {
-	page := func(path, name string) string {
-		b, err := site.ReadFile(name)
-		if err != nil {
-			t.Fatalf("falta %s: %v", name, err)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/catalogo", pageHandler("/catalogo", "catalog.html"))
+	mux.HandleFunc("/catalogo/", pageHandler("/catalogo", "catalog.html"))
+	mux.HandleFunc("/", homeHandler)
+
+	// Con barra final y sin ella: las dos formas del enlace deben servir la página.
+	for _, path := range []string{"/", "/catalogo", "/catalogo/"} {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 {
+			t.Fatalf("%s debería servir la página, dio %d", path, rec.Code)
 		}
-		return string(b)
 	}
-	home, cat := page("index.html", "index.html"), page("catalog.html", "catalog.html")
-	if !strings.Contains(home, `href="/catalogo"`) {
-		t.Fatal("index.html no enlaza al catálogo")
+
+	// Enlaces cruzados: cada página apunta a la otra, con respaldo al archivo
+	// .html por si se abre sin el servidor de Go.
+	home, err := site.ReadFile("index.html")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(cat, `href="/"`) {
-		t.Fatal("catalog.html no vuelve al launcher")
+	cat, err := site.ReadFile("catalog.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), `href="/catalogo"`) || !strings.Contains(string(home), `link.href = 'catalog.html'`) {
+		t.Fatal("index.html no enlaza al catálogo (ni cae al archivo)")
+	}
+	if !strings.Contains(string(cat), `href="/"`) || !strings.Contains(string(cat), `link.href = 'index.html'`) {
+		t.Fatal("catalog.html no vuelve al launcher (ni cae al archivo)")
 	}
 }
 
