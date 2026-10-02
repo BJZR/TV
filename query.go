@@ -25,7 +25,7 @@ var typeHints = map[string]string{
 	"pelicula": "movie", "peliculas": "movie", "movie": "movie", "film": "movie", "films": "movie",
 }
 
-// noiseWords: palabras de la web que nunca están en el título de TMDB.
+// noiseWords: palabras de la web que nunca están en el título de una película.
 var noiseWords = map[string]bool{
 	"ver": true, "viendo": true, "watch": true, "online": true, "gratis": true, "free": true,
 	"hd": true, "fullhd": true, "1080p": true, "720p": true, "480p": true, "4k": true, "uhd": true,
@@ -52,7 +52,7 @@ const (
 // parsed es la consulta ya entendida: texto limpio, año, pista de tipo e intención.
 type parsed struct {
 	Raw      string // texto tal como lo escribió el usuario
-	Query    string // texto limpio que se envía a TMDB
+	Query    string // texto limpio que se envía al buscador
 	Fold     string // Query normalizada
 	RawFold  string // Raw normalizada
 	Year     string // año suelto, p.ej. "1989"
@@ -158,8 +158,8 @@ func (p parsed) webQueries() []string {
 	return out
 }
 
-// primary devuelve las consultas que siempre se prueban (incluye el año, que
-// TMDB sí usa para títulos numéricos como "Blade Runner 2049").
+// primary devuelve las consultas que siempre se prueban, incluido el año:
+// los buscadores lo usan para títulos numéricos como "Blade Runner 2049".
 func (p parsed) primary() []string {
 	out := []string{p.Query}
 	if p.Year != "" && p.Query != "" {
