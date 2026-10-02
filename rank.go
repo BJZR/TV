@@ -2,7 +2,6 @@ package main
 
 import (
 	"math"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +29,26 @@ func fold(s string) string {
 			r = 'n'
 		case 'ç':
 			r = 'c'
+		case 'ý', 'ÿ':
+			r = 'y'
+		case 'ø':
+			r = 'o'
+		case 'æ':
+			r = 'a'
+		case 'œ':
+			r = 'o'
+		case 'ł':
+			r = 'l'
+		case 'đ':
+			r = 'd'
+		case 'ş':
+			r = 's'
+		case 'ğ':
+			r = 'g'
+		case 'ı':
+			r = 'i'
+		case '\'', '’', '`', '´':
+			continue // "marvel's" -> "marvels"
 		}
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			b.WriteRune(r)
@@ -42,29 +61,30 @@ func fold(s string) string {
 	return strings.TrimSpace(b.String())
 }
 
-// parseQuery limpia la consulta y extrae un año final opcional ("batman 1989", "batman (1989)").
-func parseQuery(raw string) (query, year string) {
-	raw = strings.Join(strings.Fields(raw), " ")
-	if r := []rune(raw); len(r) > 100 {
-		raw = string(r[:100])
-	}
-	fields := strings.Fields(raw)
-	if len(fields) > 1 {
-		last := strings.Trim(fields[len(fields)-1], "()[]")
-		if n, err := strconv.Atoi(last); err == nil && len(last) == 4 && n >= 1900 && n <= 2100 {
-			return strings.Join(fields[:len(fields)-1], " "), last
+// contentTokens parte un texto ya normalizado y quita palabras vacías.
+func contentTokens(s string) []string {
+	f := strings.Fields(s)
+	out := make([]string, 0, len(f))
+	for _, w := range f {
+		if !isStopWord(w) {
+			out = append(out, w)
 		}
 	}
-	return raw, ""
+	if len(out) == 0 {
+		return f
+	}
+	return out
 }
 
-func levenshtein(a, b []rune) int {
+// editDistance distancia de edición con transposiciones (Damerau OSA).
+func editDistance(a, b []rune) int {
 	if len(a) == 0 {
 		return len(b)
 	}
 	if len(b) == 0 {
 		return len(a)
 	}
+	prev2 := make([]int, len(b)+1)
 	prev := make([]int, len(b)+1)
 	cur := make([]int, len(b)+1)
 	for j := range prev {
@@ -77,9 +97,13 @@ func levenshtein(a, b []rune) int {
 			if a[i-1] == b[j-1] {
 				cost = 0
 			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+			best := min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				best = min(best, prev2[j-2]+1) // letras cambiadas de orden
+			}
+			cur[j] = best
 		}
-		prev, cur = cur, prev
+		prev2, prev, cur = prev, cur, prev2
 	}
 	return prev[len(b)]
 }
@@ -93,11 +117,37 @@ func similarity(a, b string) float64 {
 	if len(ra) < 4 || len(rb) < 4 {
 		return 0
 	}
-	l := max(len(ra), len(rb))
-	return 1 - float64(levenshtein(ra, rb))/float64(l)
+	d := editDistance(ra, rb)
+	sim := 1 - float64(d)/float64(max(len(ra), len(rb)))
+	if min(len(ra), len(rb)) <= 4 && d > 1 {
+		sim = math.Min(sim, 0.55) // "gato" y "pato" no son la misma palabra
+	}
+	return math.Max(sim, 0)
 }
 
-// textScore puntúa (0..100) qué tan bien un título (ya normalizado) responde a la consulta (normalizada).
+// bestToken puntúa cuánto se parece una palabra de la consulta a una del título.
+func bestToken(a string, tt []string) float64 {
+	best := 0.0
+	for _, b := range tt {
+		var s float64
+		switch {
+		case a == b:
+			s = 1
+		case len(a) >= 2 && strings.HasPrefix(b, a):
+			s = 0.9 - math.Min(0.25, 0.03*float64(len([]rune(b))-len([]rune(a))))
+		default:
+			if sim := similarity(a, b); sim >= 0.6 {
+				s = sim * 0.92
+			}
+		}
+		best = math.Max(best, s)
+	}
+	return best
+}
+
+// textScore puntúa (0..100) qué tan bien un título (ya normalizado) responde a
+// la consulta (normalizada): cobertura de palabras, frase completa, prefijo,
+// subsecuencia y penalización por palabras de sobra.
 func textScore(q, t string) float64 {
 	if q == "" || t == "" {
 		return 0
@@ -105,37 +155,54 @@ func textScore(q, t string) float64 {
 	if q == t {
 		return 100
 	}
-	if strings.HasPrefix(t, q) {
-		return 88 - math.Min(10, float64(len(t)-len(q))*0.3)
+	qt, tt := contentTokens(q), contentTokens(t)
+	if len(qt) == 0 || len(tt) == 0 {
+		return 0
 	}
-	qt, tt := strings.Fields(q), strings.Fields(t)
+	// Solo cambiaban los artículos: "the matrix" es "matrix".
+	if strings.Join(qt, " ") == strings.Join(tt, " ") {
+		return 100
+	}
 	var sum float64
 	for _, a := range qt {
-		best := 0.0
-		for _, b := range tt {
-			var s float64
-			switch {
-			case a == b:
-				s = 1
-			case len(a) >= 2 && strings.HasPrefix(b, a):
-				s = 0.9
-			default:
-				if sim := similarity(a, b); sim >= 0.7 {
-					s = sim * 0.9
-				}
-			}
-			best = math.Max(best, s)
-		}
-		sum += best
+		sum += bestToken(a, tt)
 	}
-	score := 80 * sum / float64(len(qt))
+	score := 78 * sum / float64(len(qt))
+
+	// La consulta completa aparece dentro del título: "blade runner" ~ "blade runner 2049".
 	if strings.Contains(t, q) {
-		score = math.Max(score, 70)
+		score = math.Max(score, 74)
+	}
+	// El título empieza con la consulta: "batman" ~ "batman begins".
+	if strings.HasPrefix(t, q) {
+		extra := len(tt) - len(qt)
+		score = math.Max(score, 86-math.Min(22, float64(extra)*4))
+	}
+	if score < 74 && isSubsequence(q, t) {
+		score = math.Max(score, 62)
 	}
 	if extra := len(tt) - len(qt); extra > 0 {
-		score -= math.Min(12, float64(extra)*2)
+		score -= math.Min(14, float64(extra)*2.5)
 	}
-	return math.Max(score, 0)
+	return math.Max(0, math.Min(100, score))
+}
+
+// isSubsequence indica si q aparece en t respetando el orden.
+func isSubsequence(q, t string) bool {
+	if len(q) < 3 {
+		return false
+	}
+	qr := []rune(q)
+	i := 0
+	for _, r := range t {
+		if r == qr[i] {
+			i++
+			if i == len(qr) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func bestText(q string, titles ...string) float64 {
@@ -161,78 +228,146 @@ func trimRunes(s string, n int) string {
 	return strings.TrimSpace(string(r[:n])) + "…"
 }
 
-// rank puntúa y ordena candidatos combinando coincidencia de texto, año y popularidad.
-func rank(cands []*candidate, rawFold, cleanFold, year string) []Result {
-	type scored struct {
-		r    Result
-		text float64
-		pop  float64
+// matchScore puntúa un candidato contra la consulta entendida (0..100).
+func matchScore(c *candidate, p parsed) float64 {
+	text := bestText(p.Fold, c.Title, c.OrigTitle, c.EnTitle)
+	if p.RawFold != p.Fold {
+		text = math.Max(text, bestText(p.RawFold, c.Title, c.OrigTitle, c.EnTitle))
 	}
-	var all []scored
+
+	// Actor/director: la consulta era su nombre, no el título de la obra.
+	if c.Via != "" {
+		via := textScore(p.Fold, fold(c.Via))
+		if text >= 45 && via >= 60 {
+			text += 4 // el título también coincide
+		}
+		text = math.Max(text, via*0.62)
+	}
+
+	if p.Kind != "" {
+		if p.Kind == c.Type {
+			text += 6
+		} else {
+			text -= 4
+		}
+	}
+
+	switch {
+	case p.From > 0:
+		cy, _ := strconv.Atoi(yearOf(c.Date))
+		if cy >= p.From && cy <= p.To {
+			text += 16
+		} else if cy > 0 {
+			text -= 8
+		}
+	case p.Year != "":
+		want, _ := strconv.Atoi(p.Year)
+		cy, _ := strconv.Atoi(yearOf(c.Date))
+		switch d := abs(cy - want); {
+		case cy == 0:
+		case d == 0:
+			text += 18
+		case d == 1:
+			text += 7
+		default:
+			text -= 6
+		}
+	}
+	return math.Max(0, math.Min(100, text))
+}
+
+// ratingBonus usa la media ponderada de IMDb: una nota alta con pocos votos no
+// sube tanto como una nota alta con muchos votos.
+func ratingBonus(c *candidate) float64 {
+	if c.Votes <= 0 || c.Rating <= 0 {
+		return 0
+	}
+	const m, global = 1500.0, 6.6
+	v := float64(c.Votes)
+	weighted := (v/(v+m))*c.Rating + (m/(v+m))*global
+	return math.Max(-9, math.Min(9, (weighted-global)*3))
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// rank puntúa y ordena candidatos combinando coincidencia de texto, año,
+// popularidad y calidad de la votación.
+func rank(cands []*candidate, p parsed) []Result {
+	type scored struct {
+		r     Result
+		text  float64
+		score float64
+		pop   float64
+	}
+	all := make([]scored, 0, len(cands))
 	for _, c := range cands {
-		titles := []string{c.Title, c.OrigTitle, c.EnTitle}
-		tClean := bestText(cleanFold, titles...)
-		tFull := tClean
-		if rawFold != cleanFold {
-			tFull = math.Max(tClean, bestText(rawFold, titles...))
+		if c == nil {
+			continue
 		}
-		text := tClean
-		cy := yearOf(c.Date)
-		if year != "" {
-			switch {
-			case cy == year:
-				text = tFull + 25
-			case tFull >= 90:
-				text = tFull
-			default:
-				text = tClean - 15
-			}
-		}
-		if c.Via != "" {
-			text = c.viaScore * 0.5
-		}
+		text := matchScore(c, p)
 		score := text
-		score += math.Min(14, 4.5*math.Log10(1+c.Pop))
-		score += math.Min(8, 1.6*math.Log10(1+float64(c.Votes)))
+		score += math.Min(12, 4.5*math.Log10(1+c.Pop))
+		score += ratingBonus(c)
 		if c.Poster == "" {
-			score -= 6
+			score -= 5
 		}
 		if c.Overview == "" && c.Votes < 10 {
-			score -= 8
+			score -= 6
 		}
 		if c.Votes == 0 && c.Pop < 1 {
-			score -= 5
+			score -= 4
 		}
 		all = append(all, scored{
 			r: Result{
 				ID: c.ID, Type: c.Type, Title: c.Title, OriginalTitle: c.OrigTitle,
-				Year: cy, Overview: trimRunes(c.Overview, 220), Poster: c.Poster,
+				Year: yearOf(c.Date), Overview: trimRunes(c.Overview, 220), Poster: c.Poster,
 				Backdrop: c.Backdrop, Rating: math.Round(c.Rating*10) / 10, Votes: c.Votes,
-				Source: "TMDB", Via: c.Via, Score: math.Round(score*10) / 10,
+				Source: "TMDB", Via: c.Via,
+				Match: text, Score: math.Round(score*10) / 10,
 			},
-			text: text, pop: c.Pop,
+			text: text, score: score, pop: c.Pop,
 		})
 	}
-	// Si hay buenas coincidencias, descarta el ruido.
+
+	// Si hay buenas coincidencias, descarta el ruido de TMDB.
 	strong := 0
 	for _, s := range all {
-		if s.text >= 50 {
+		if s.text >= 55 {
 			strong++
 		}
 	}
-	var out []scored
+	cut := 0.0
+	switch {
+	case strong >= 3:
+		cut = 30
+	case strong >= 2:
+		cut = 26
+	case strong == 1:
+		cut = 12
+	}
+	out := make([]scored, 0, len(all))
 	for _, s := range all {
-		if strong >= 3 && s.text < 25 {
+		if cut > 0 && s.text < cut {
 			continue
 		}
 		out = append(out, s)
 	}
+
 	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].r.Score != out[j].r.Score {
-			return out[i].r.Score > out[j].r.Score
+		if out[i].score != out[j].score {
+			return out[i].score > out[j].score
+		}
+		if out[i].text != out[j].text {
+			return out[i].text > out[j].text
 		}
 		return out[i].pop > out[j].pop
 	})
+
 	res := make([]Result, len(out))
 	for i, s := range out {
 		res[i] = s.r
@@ -240,6 +375,11 @@ func rank(cands []*candidate, rawFold, cleanFold, year string) []Result {
 	return res
 }
 
-var sportsRe = regexp.MustCompile(`\b(vs|en vivo|en directo|directo|futbol|partido|liga|champions|mundial|copa|eliminatorias|nba|nfl|ufc|f1|formula 1|tenis|boxeo|beisbol|libertadores)\b`)
-
-func looksSporty(f string) bool { return sportsRe.MatchString(f) }
+// bestMatchText devuelve la mejor coincidencia de texto de los resultados.
+func bestMatchText(results []Result) float64 {
+	best := 0.0
+	for _, r := range results {
+		best = math.Max(best, r.Match)
+	}
+	return best
+}
