@@ -20,7 +20,7 @@ func TestLaPaginaDiceLosIndices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`id="srcs"`, "data.sources.join"} {
+	for _, want := range []string{`id="srcs"`, "sources = data.sources", "sources.join("} {
 		if !strings.Contains(string(page), want) {
 			t.Errorf("catalog.html no muestra los índices: falta %q", want)
 		}
@@ -340,33 +340,33 @@ func TestRankResultsNoSaturaLaPuntuacion(t *testing.T) {
 
 func TestCacheSirveYExpira(t *testing.T) {
 	cacheFlush()
-	cacheSet("k", []Result{{Title: "a"}}, time.Minute, false)
-	if rs, ok := cacheGet("k", false); !ok || len(rs) != 1 {
+	cacheSet("k", []Result{{Title: "a"}}, nil, time.Minute, false)
+	if rs, _, ok := cacheGet("k", false); !ok || len(rs) != 1 {
 		t.Fatal("la caché no devolvió lo guardado")
 	}
-	cacheSet("v", []Result{{Title: "b"}}, time.Millisecond, false)
+	cacheSet("v", []Result{{Title: "b"}}, nil, time.Millisecond, false)
 	time.Sleep(5 * time.Millisecond)
-	if _, ok := cacheGet("v", false); ok {
+	if _, _, ok := cacheGet("v", false); ok {
 		t.Fatal("un TTL vencido no debe servir")
 	}
-	if _, ok := cacheStale("v"); !ok {
+	if _, _, ok := cacheStale("v"); !ok {
 		t.Fatal("el respaldo debe servir datos viejos aunque el TTL venz")
 	}
 }
 
 func TestCacheParcialYNegativo(t *testing.T) {
 	cacheFlush()
-	cacheSet("p", []Result{{Title: "a"}}, time.Minute, true)
-	if _, ok := cacheGet("p", false); ok {
+	cacheSet("p", []Result{{Title: "a"}}, nil, time.Minute, true)
+	if _, _, ok := cacheGet("p", false); ok {
 		t.Error("una búsqueda rápida no debe valer para una completa")
 	}
-	if _, ok := cacheGet("p", true); !ok {
+	if _, _, ok := cacheGet("p", true); !ok {
 		t.Error("debe valer para una rápida")
 	}
 	// Una completa manda sobre una rápida ya guardada.
-	cacheSet("p", []Result{{Title: "a"}}, time.Minute, false)
-	cacheSet("p", []Result{{Title: "corto"}}, time.Minute, true)
-	if rs, _ := cacheGet("p", false); len(rs) != 1 || rs[0].Title != "a" {
+	cacheSet("p", []Result{{Title: "a"}}, nil, time.Minute, false)
+	cacheSet("p", []Result{{Title: "corto"}}, nil, time.Minute, true)
+	if rs, _, _ := cacheGet("p", false); len(rs) != 1 || rs[0].Title != "a" {
 		t.Errorf("una rápida no debe pisar a la completa: %+v", rs)
 	}
 }
@@ -374,7 +374,7 @@ func TestCacheParcialYNegativo(t *testing.T) {
 func TestCacheEviction(t *testing.T) {
 	cacheFlush()
 	for i := 0; i < cacheMax+10; i++ {
-		cacheSet("k"+strings.Repeat("x", i%3)+string(rune('a'+i%26))+string(rune('a'+i/26)), []Result{{Title: "a"}}, time.Minute, false)
+		cacheSet("k"+strings.Repeat("x", i%3)+string(rune('a'+i%26))+string(rune('a'+i/26)), []Result{{Title: "a"}}, nil, time.Minute, false)
 	}
 	cacheMu.Lock()
 	n := cacheLRU.Len()
@@ -495,11 +495,17 @@ func (f *fakeEngine) point(t *testing.T) {
 		{"Falso", f.srv.URL + "/sug/uno?q=%s"},
 		{"Otro", f.srv.URL + "/sug/dos?q=%s"},
 	}
+	// El cortacircuitos y el ritmo son estado global: en las pruebas estorban.
+	oldGap := ddgGap
+	ddgGap = 0
+	ddgReset()
 	cacheFlush()
 	t.Cleanup(func() {
 		ddgHTML, ddgLite, ddgSuggest = oldHTML, oldLite, oldSug
 		wikiAPI, wikiSite, archiveAPI, wibySearch = oldWikiAPI, oldWikiSite, oldArchive, oldWiby
 		suggestSources = oldSources
+		ddgGap = oldGap
+		ddgReset()
 	})
 }
 
@@ -848,7 +854,7 @@ func TestSearchAllConsultaCadaIndice(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"DuckDuckGo", "Wikipedia", "Internet Archive", "Wiby"} {
-		if !contains(sources, want) {
+		if !has(sources, want) {
 			t.Errorf("faltó el índice %s en %+v", want, sources)
 		}
 	}
@@ -929,10 +935,10 @@ func TestSearchAllFiltraPorAño(t *testing.T) {
 
 func TestVoteResultsCuentaElAcuerdo(t *testing.T) {
 	all := []Result{
-		{URL: "https://a.example/x", Title: "Matrix", Snippet: "corto"},
-		{URL: "https://a.example/x/", Title: "Matrix", Snippet: "resumen largo que gana"},
-		{URL: "https://b.example/y", Title: "Matrix"},
-		{URL: "https://c.example/z", Title: "Matrix"},
+		{URL: "https://a.example/x", Host: "a.example", Title: "Matrix", Snippet: "corto"},
+		{URL: "https://a.example/x/", Host: "a.example", Title: "Matrix", Snippet: "resumen largo que gana"},
+		{URL: "https://b.example/y", Host: "b.example", Title: "Matrix"},
+		{URL: "https://c.example/z", Host: "c.example", Title: "Otra cosa"},
 	}
 	out := voteResults(all, nil)
 	if len(out) != 3 {
@@ -1049,15 +1055,6 @@ func TestSuggestAllFiltraCirilico(t *testing.T) {
 	}
 }
 
-func contains(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
-}
-
 func TestSuggestAllDescartaLoQueNoTieneQueVer(t *testing.T) {
 	f := newFakeEngine(t, ``, `[{"phrase":"matrix 1999"},{"phrase":"receta de gazpacho"}]`)
 	f.point(t)
@@ -1095,5 +1092,132 @@ func TestLooksBlocked(t *testing.T) {
 		if looksBlocked(body) {
 			t.Errorf("falso positivo con %q", body)
 		}
+	}
+}
+
+// ---------- El buscador principal tiene que respirar ----------
+
+func TestElCortacircuitosDescansaElBuscador(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.point(t)
+
+	if ddgQuiet() {
+		t.Fatal("un buscador recién arrancado no debería estar descansando")
+	}
+	ddgBlocked()
+	if !ddgQuiet() {
+		t.Fatal("tras un bloqueo el buscador debe descansar")
+	}
+	// Mientras descansa, la búsqueda la sostienen los otros índices.
+	f.serve("/wiby", `<blockquote><a class="tlink" href="https://viejo.example/matrix">Matrix vieja</a><p>La Matrix de 1999</p></blockquote>`)
+	rs, sources, err := searchAll(context.Background(), parseQuery("matrix"))
+	if err != nil || len(rs) == 0 {
+		t.Fatalf("la búsqueda debe continuar sin el buscador principal: %v", err)
+	}
+	if has(sources, "DuckDuckGo") {
+		t.Errorf("no debería haber preguntado al buscador dormido: %+v", sources)
+	}
+	if !has(sources, "Wiby") {
+		t.Errorf("los otros índices deben responder: %+v", sources)
+	}
+
+	// Cuando vuelve a responder, se olvida el castigo.
+	ddgOK()
+	if ddgQuiet() {
+		t.Error("tras una respuesta buena el castigo debe terminar")
+	}
+}
+
+func TestWaitTurnRespetaElRitmo(t *testing.T) {
+	ddgReset()
+	old := ddgGap
+	ddgGap = 60 * time.Millisecond
+	defer func() { ddgGap = old; ddgReset() }()
+
+	start := time.Now()
+	for i := 0; i < 3; i++ {
+		if err := waitTurn(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if waited := time.Since(start); waited < 100*time.Millisecond {
+		t.Errorf("tres turnos con 60ms entre ellos tardaron %v: no está espaciando", waited)
+	}
+}
+
+func TestElAvisoSaleCuandoElBuscadorEstaCerrado(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.serve("/wiki", `{"query":{"search":[{"title":"Matrix","snippet":"película"}]}}`)
+	f.point(t)
+
+	// Con el buscador funcionando no hay aviso.
+	rec := httptest.NewRecorder()
+	searchHandler(rec, httptest.NewRequest("GET", "/api/search?q=matrix", nil))
+	var sr SearchResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &sr); err != nil {
+		t.Fatal(err)
+	}
+	if sr.Notice != "" {
+		t.Errorf("sin bloqueo no debería haber aviso: %q", sr.Notice)
+	}
+	if !has(sr.Sources, "DuckDuckGo") {
+		t.Fatalf("índices = %+v", sr.Sources)
+	}
+
+	// Ahora el buscador descansa: los resultados vienen de otros y hay que decirlo.
+	ddgBlocked()
+	cacheFlush()
+	rec = httptest.NewRecorder()
+	searchHandler(rec, httptest.NewRequest("GET", "/api/search?q=matrix%202024", nil))
+	sr = SearchResponse{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &sr); err != nil {
+		t.Fatal(err)
+	}
+	if has(sr.Sources, "DuckDuckGo") {
+		t.Errorf("no se debe preguntar al buscador dormido: %+v", sr.Sources)
+	}
+	if len(sr.Results) == 0 {
+		t.Error("los otros índices deben seguir dando resultados")
+	}
+	if sr.Notice == "" {
+		t.Error("con el buscador cerrado debe avisar de dónde vienen los resultados")
+	}
+	ddgReset()
+}
+
+// ---------- Brave, solo si hay clave ----------
+
+func TestBraveSinClaveNoSeConsulta(t *testing.T) {
+	if braveKey != "" {
+		t.Skip("esta máquina tiene BRAVE_API_KEY")
+	}
+	if _, err := braveSource(context.Background(), []string{"matrix"}); !errors.Is(err, errNoEngine) {
+		t.Errorf("err = %v, quería errNoEngine", err)
+	}
+}
+
+func TestBraveConClave(t *testing.T) {
+	f := newFakeEngine(t, ``, `[]`)
+	f.serve("/brave", `{"web":{"results":[
+		{"title":"The Matrix | Netflix","url":"https://netflix.com/title/20557937","description":"Ver The Matrix en línea"},
+		{"title":"","url":"https://vacio.example/x","description":"descartado"}]}}`)
+	oldKey, oldAPI, oldSources := braveKey, braveAPI, webSources
+	braveKey, braveAPI = "clave-de-prueba", f.srv.URL+"/brave"
+	webSources = append([]source{{name: "Brave", limit: maxHits, fetch: braveSource}}, webSources...)
+	defer func() { braveKey, braveAPI, webSources = oldKey, oldAPI, oldSources }()
+	f.point(t)
+
+	rs, err := braveSource(context.Background(), []string{"matrix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rs) != 1 {
+		t.Fatalf("resultados = %+v", rs)
+	}
+	if rs[0].Platform != "Netflix" || rs[0].Source != "Brave" {
+		t.Errorf("no reconoció la plataforma: %+v", rs[0])
+	}
+	if rs[0].Snippet != "Ver The Matrix en línea" {
+		t.Errorf("resumen = %q", rs[0].Snippet)
 	}
 }

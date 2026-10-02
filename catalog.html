@@ -96,6 +96,8 @@
     .head h1 b { color: var(--acc); }
     .count { color: var(--muted); font-size: .9rem; }
     .srcs { color: var(--muted); font-size: .82rem; margin-top: .15rem; }
+    .tag.ok { background: #14361f; color: #7ee2a8; }
+    .notice { color: #e8c07a; font-size: .84rem; margin-top: .1rem; }
 
     .tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
     .tab {
@@ -224,6 +226,7 @@
       <h1 id="title">Resultados</h1>
       <span class="count" id="count"></span>
       <span class="srcs" id="srcs"></span>
+      <span class="notice" id="notice"></span>
     </div>
 
     <nav class="tabs" id="tabs">
@@ -260,10 +263,10 @@
     })();
 
     const TAGS = { plataforma: 'plataforma', video: 'video', info: 'info', web: 'web' };
-    const list = $('#list'), state = $('#state'), title = $('#title'), count = $('#count'), srcs = $('#srcs');
+    const list = $('#list'), state = $('#state'), title = $('#title'), count = $('#count'), srcs = $('#srcs'), notice = $('#notice');
 
     let query = new URLSearchParams(location.search).get('q') || '';
-    let all = [], filter = 'all', token = 0;
+    let all = [], sources = [], lastNotice = '', filter = 'all', token = 0;
 
     function say(html) { state.innerHTML = html; state.hidden = !html; }
     function loading() { list.innerHTML = ''; say('<span class="spin"></span>Buscando en la web…'); }
@@ -276,6 +279,7 @@
         title.textContent = 'Resultados';
         count.textContent = '';
         srcs.textContent = '';
+        notice.textContent = '';
         list.innerHTML = '';
         say('<b>Escribe el nombre de una película</b>Arriba tienes el buscador. Escribe el título y te digo dónde verla.');
         return;
@@ -291,6 +295,8 @@
         if (mine !== token) return; // llegó otra búsqueda mientras esperaba
         if (!res.ok) throw new Error(data.error || 'No se pudo buscar');
         all = data.results || [];
+        sources = data.sources || [];
+        lastNotice = data.notice || '';
         render();
       } catch (err) {
         if (mine !== token) return;
@@ -308,9 +314,10 @@
     function render() {
       const rs = visible();
       count.textContent = all.length ? rs.length + ' de ' + all.length : '';
-      srcs.textContent = (data.sources && data.sources.length > 1)
-        ? 'Buscado en ' + data.sources.join(', ') + '. Si varios índices lo señalan, más seguro.'
+      srcs.textContent = sources.length > 1
+        ? 'Buscado en ' + sources.join(', ') + '. Si varios índices lo señalan, más seguro.'
         : '';
+      notice.textContent = data.notice || '';
       if (!all.length) {
         list.innerHTML = '';
         say('<b>Nada por ahora</b>Prueba con el título en el idioma original, o sin el año.');
@@ -329,6 +336,7 @@
             <div class="t"><span class="txt">${esc(r.title)}</span>
               ${r.platform ? `<span class="tag ${esc(TAGS[r.kind] || 'web')}">${esc(r.platform)}</span>` : ''}
               ${r.year ? `<span class="tag yr">${esc(r.year)}</span>` : ''}
+              ${r.votes > 1 ? `<span class="tag ok">${r.votes} índices</span>` : ''}
             </div>
             ${r.snippet ? `<p class="snip">${esc(r.snippet)}</p>` : ''}
             <p class="src">${esc(r.host)}</p>

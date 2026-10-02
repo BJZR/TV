@@ -10,10 +10,42 @@ relevancia. Sin TMDB, sin registro, sin límites de cuota.
 - `/resultados?q=matrix` — resultados de la búsqueda.
 
 ## API
-- `GET /api/search?q=matrix&limit=24` → páginas donde aparece la película,
+- `GET /api/search?q=matrix&limit=24` → páginas donde aparece la película, ya
   ordenadas. Cada resultado trae `title`, `url`, `host`, `snippet`, `year`,
-  `platform`, `kind` (`plataforma`, `video`, `info`, `web`), `favicon` y `score`.
-- `GET /api/suggest?q=mat` → lo que la gente suele escribir a partir de eso.
+  `platform`, `kind` (`plataforma`, `video`, `info`, `web`), `favicon`, `source`,
+  `votes` (cuántos índices lo encontraron) y `score`. La respuesta incluye
+  `sources`: los índices que respondieron.
+- `GET /api/suggest?q=mat` → lo que la gente escribe a partir de eso.
+
+## Cómo busca en toda la web
+
+Un solo buscador solo ve lo que él ha rastreado. Por eso se pregunta a varios
+índices a la vez y se fusiona lo que devuelven: la unión llega a páginas que
+ninguno habría encontrado solo.
+
+| Índice | Qué aporta |
+| --- | --- |
+| **DuckDuckGo** | el grueso de la web, en dos variantes (html y lite) |
+| **Wikipedia** | el nombre oficial, el año y los títulos alternativos |
+| **Internet Archive** | películas de dominio público que se pueden ver ahí mismo |
+| **Wiby** | un índice independiente: páginas personales y sitios olvidados |
+
+Las fuentes que fallan, piden captcha o tardan se saltan y la búsqueda sigue con los
+demás; la respuesta dice siempre en cuáles salió algo. Las sugerencias van
+ainstead más lejos: se consulta con seis autocompletados (DuckDuckGo, Google,
+Brave, Bing, Yahoo y Yandex) y se mezclan por acuerdo: la frase que proponen más
+buscadores es la que más gente escribe.
+
+Las sugerencias se filtran: se descarta lo que no empieza por lo tecleado y lo
+que viene en alfabeto cirílico, que Yandex devuelve a menudo.
+
+### Motores que no están
+
+Mojeek, Brave, Ecosia, Startpage, Yandex, Bing y las instancias públicas de
+SearXNG responden con captcha, challenge o 429 desde IPs de nube. No están en el
+registro a propósito: cuando están bloqueados solo suman espera. Si desde tu
+servidor alguno responde, se añade al registro (`webSources` en `sources.go`) y
+suma cobertura sin tocar nada más.
 
 ## Cómo decide el orden
 1. Limpia la consulta: saca año, rango de años, palabras de ruido ("ver", "en
@@ -22,7 +54,11 @@ relevancia. Sin TMDB, sin registro, sin límites de cuota.
 3. Puntúa cada página por coincidencia de texto con el título (tolera acentos,
    erratas y palabras de más), año, si es una plataforma de streaming y si el
    resumen promete película. Descarta lo que no habla de lo que buscabas.
-4. Fusiona y deduplica: la misma página en dos idiomas o países es una sola.
+4. Fusiona y deduplica: la misma página en dos idiomas o países es una sola, y
+   si varios índices la señalan sube en el orden.
+5. Descarta lo que no es la película: si pediste un año, la que lo lleva en el
+   título se queda fuera; y de una misma web no salen más de dos resultados, para
+   que una plataforma no se lleve la pantalla entera.
 
 ## Caché
 LRU en memoria: 30 min por consulta, 6 h de respaldo si el buscador falla y
@@ -72,7 +108,8 @@ Las dos salidas:
 | Archivo | De qué se ocupa |
 | --- | --- |
 | `main.go` | servidor, rutas, gzip y páginas embebidas |
-| `websearch.go` | consulta y lee el HTML del buscador, clasifica plataformas, ordena |
+| `sources.go` | los cuatro índices, las seis sugerencias y la fusión |
+| `websearch.go` | lee el HTML, clasifica plataformas y ordena por puntuación |
 | `search.go` | caché, peticiones agrupadas y handlers |
 | `query.go` | entiende lo que escribe la gente |
 | `rank.go` | compara textos: acentos, erratas, títulos parecidos |

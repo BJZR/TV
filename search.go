@@ -37,6 +37,7 @@ type SearchResponse struct {
 	Suggestion string   `json:"suggestion,omitempty"`
 	Engine     string   `json:"engine,omitempty"`
 	Sources    []string `json:"sources,omitempty"`
+	Notice     string   `json:"notice,omitempty"`
 }
 
 // ---------- Caché LRU con TTL y respaldo de datos viejos ----------
@@ -44,6 +45,7 @@ type SearchResponse struct {
 type cacheItem struct {
 	key     string
 	rs      []Result
+	sources []string // de qué índices salieron, para poder decirlo también desde caché
 	at      time.Time
 	ttl     time.Duration
 	partial bool // solo sugerencias: vale menos
@@ -69,43 +71,43 @@ const (
 
 // cacheGet devuelve resultados frescos. allowPartial acepta los que salieron
 // de una búsqueda rápida (sugerencias), que pueden quedarse cortos.
-func cacheGet(key string, allowPartial bool) ([]Result, bool) {
+func cacheGet(key string, allowPartial bool) ([]Result, []string, bool) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	el, ok := cacheMap[key]
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 	it := el.Value.(*cacheItem)
 	if time.Since(it.at) > it.ttl {
-		return nil, false
+		return nil, nil, false
 	}
 	if it.partial && !allowPartial {
-		return nil, false
+		return nil, nil, false
 	}
 	cacheLRU.MoveToFront(el)
-	return it.rs, true
+	return it.rs, it.sources, true
 }
 
 // cacheStale devuelve resultados vencidos para no dejar al usuario sin
 // respuesta cuando el buscador falla.
-func cacheStale(key string) ([]Result, bool) {
+func cacheStale(key string) ([]Result, []string, bool) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	el, ok := cacheMap[key]
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 	it := el.Value.(*cacheItem)
 	if time.Since(it.at) > cacheStaleTTL {
 		cacheLRU.Remove(el)
 		delete(cacheMap, key)
-		return nil, false
+		return nil, nil, false
 	}
-	return it.rs, true
+	return it.rs, it.sources, true
 }
 
-func cacheSet(key string, rs []Result, ttl time.Duration, partial bool) {
+func cacheSet(key string, rs []Result, sources []string, ttl time.Duration, partial bool) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	if el, ok := cacheMap[key]; ok {
@@ -114,7 +116,7 @@ func cacheSet(key string, rs []Result, ttl time.Duration, partial bool) {
 		if partial && !it.partial && time.Since(it.at) <= it.ttl {
 			return
 		}
-		it.rs, it.at, it.partial = rs, time.Now(), partial
+		it.rs, it.sources, it.at, it.partial = rs, sources, time.Now(), partial
 		if !partial {
 			it.ttl = ttl
 		}
@@ -127,7 +129,7 @@ func cacheSet(key string, rs []Result, ttl time.Duration, partial bool) {
 			delete(cacheMap, back.Value.(*cacheItem).key)
 		}
 	}
-	cacheMap[key] = cacheLRU.PushFront(&cacheItem{key: key, rs: rs, at: time.Now(), ttl: ttl, partial: partial})
+	cacheMap[key] = cacheLRU.PushFront(&cacheItem{key: key, rs: rs, sources: sources, at: time.Now(), ttl: ttl, partial: partial})
 }
 
 func cacheFlush() {
@@ -180,6 +182,16 @@ func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([
 	return c.rs, c.sources, c.err
 }
 
+// has mira si una lista de texto contiene un valor.
+func has(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
 // ---------- Búsqueda ----------
 
 func cacheKey(p parsed) string {
@@ -193,8 +205,8 @@ func cacheKey(p parsed) string {
 // results busca en la web con caché y peticiones agrupadas.
 func results(ctx context.Context, p parsed) ([]Result, []string, error) {
 	key := cacheKey(p)
-	if rs, ok := cacheGet(key, true); ok {
-		return rs, nil, nil
+	if rs, sources, ok := cacheGet(key, true); ok {
+		return rs, sources, nil
 	}
 	rs, sources, err := fetchShared(ctx, key, func(ctx context.Context) ([]Result, []string, error) {
 		return searchAll(ctx, p)
@@ -204,11 +216,11 @@ func results(ctx context.Context, p parsed) ([]Result, []string, error) {
 		if len(rs) == 0 {
 			ttl = cacheNegTTL // no castigar a los buscadores por consultas sin resultados
 		}
-		cacheSet(key, rs, ttl, false)
+		cacheSet(key, rs, sources, ttl, false)
 		return rs, sources, nil
 	}
-	if stale, ok := cacheStale(key); ok {
-		return stale, nil, nil
+	if stale, sources, ok := cacheStale(key); ok {
+		return stale, sources, nil
 	}
 	return nil, nil, err
 }
@@ -225,6 +237,11 @@ func runSearch(ctx context.Context, rawQuery string, limit int) (*SearchResponse
 		return nil, err
 	}
 	resp.Sources = sources
+	// Si el buscador principal está castigado, decirlo: si no, el usuario
+	// piensa que la película no existe en la web.
+	if ddgQuiet() && !has(sources, "DuckDuckGo") {
+		resp.Notice = "El buscador principal está cerrado temporalmente. Estos resultados salen de los otros índices."
+	}
 	ranked := rankResults(rs, p)
 
 	resp.Total = len(ranked)
