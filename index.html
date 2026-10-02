@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart TV Launcher</title>
+  <title>Smart TV Hub Launcher</title>
   <style>
     :root {
       --bg-gradient: linear-gradient(135deg, #0b1120 0%, #151f32 100%);
@@ -19,7 +19,7 @@
       background: var(--bg-gradient);
       color: var(--text-main);
       font-family: system-ui, -apple-system, sans-serif;
-      padding: 2.5rem;
+      padding: 2rem;
       min-height: 100vh;
     }
 
@@ -27,7 +27,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 2.5rem;
+      margin-bottom: 1.5rem;
     }
 
     .brand {
@@ -37,8 +37,8 @@
     }
 
     .brand-icon {
-      width: 48px;
-      height: 48px;
+      width: 44px;
+      height: 44px;
       background: var(--accent-color);
       border-radius: 12px;
       display: flex;
@@ -47,11 +47,141 @@
       box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
     }
 
-    .brand-icon svg { width: 28px; height: 28px; fill: #0b1120; }
-    .brand-text h1 { font-size: 1.8rem; font-weight: 700; }
+    .brand-icon svg { width: 26px; height: 26px; fill: #0b1120; }
+    .brand-text h1 { font-size: 1.6rem; font-weight: 700; }
     .clock-container { text-align: right; }
-    .clock-time { font-size: 2rem; font-weight: 700; color: var(--text-main); }
-    .clock-date { font-size: 0.9rem; color: var(--text-muted); text-transform: capitalize; }
+    .clock-time { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+    .clock-date { font-size: 0.85rem; color: var(--text-muted); text-transform: capitalize; }
+
+    /* Buscador Global Estilo Seekee */
+    .search-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 0.75rem;
+      background: rgba(15, 23, 42, 0.9);
+      padding: 0.75rem 1.25rem;
+      border-radius: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .search-box:focus-within {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+
+    .search-box input {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 1.1rem;
+      width: 100%;
+      outline: none;
+    }
+
+    /* Vista de Resultados de Búsqueda Seekee */
+    .results-view {
+      display: none;
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      border: 2px solid var(--accent-color);
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 0.75rem;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .result-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-decoration: none;
+      color: white;
+      border: 2px solid transparent;
+      outline: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 120px;
+      transition: all 0.2s ease;
+    }
+
+    .result-card:focus {
+      border-color: var(--accent-color);
+      transform: scale(1.05);
+      background: #334155;
+      box-shadow: 0 10px 20px rgba(56, 189, 248, 0.3);
+    }
+
+    .result-card .tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent-color);
+      text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      align-self: flex-start;
+    }
+
+    .result-card .title {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-top: 0.75rem;
+    }
+
+    .result-card .source {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    /* Filtros Superiores */
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .filter-btn {
+      background: rgba(30, 41, 59, 0.8);
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.6rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      white-space: nowrap;
+    }
+
+    .filter-btn.active {
+      background: var(--accent-color);
+      color: #0b1120;
+      border-color: var(--accent-color);
+    }
+
+    .filter-btn:focus {
+      border-color: white;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
 
     .controls-bar {
       display: flex;
@@ -171,7 +301,7 @@
       background: rgba(0, 0, 0, 0.8);
       align-items: center;
       justify-content: center;
-      z-index: 100;
+      z-index: 200;
     }
 
     .modal-content {
@@ -185,7 +315,7 @@
       gap: 1rem;
     }
 
-    .modal-content input {
+    .modal-content input, .modal-content select {
       padding: 0.75rem;
       border-radius: 8px;
       border: 1px solid #475569;
@@ -212,14 +342,41 @@
     </div>
   </header>
 
+  <!-- Buscador Global -->
+  <section class="search-section">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Buscar películas, series o partidos en la web..." tabindex="0" onkeyup="if(event.key==='Enter') runSeekeeSearch()">
+      <button class="btn-action" onclick="runSeekeeSearch()" tabindex="0">Buscar</button>
+    </div>
+  </section>
+
+  <!-- Menú de Resultados de Búsqueda Seekee -->
+  <section class="results-view" id="resultsView">
+    <div class="results-header">
+      <h2 id="resultsTitle">Resultados Globales</h2>
+      <button class="btn-action" onclick="closeResults()" tabindex="0">Cerrar Resultados</button>
+    </div>
+    <div class="results-grid" id="resultsContent"></div>
+  </section>
+
+  <!-- Filtros Superiores -->
+  <nav class="filter-bar">
+    <button class="filter-btn active" onclick="filterCategory('all', this)" tabindex="0">Todos</button>
+    <button class="filter-btn" onclick="filterCategory('cine', this)" tabindex="0">Cine y Películas</button>
+    <button class="filter-btn" onclick="filterCategory('deportes', this)" tabindex="0">Fútbol y Deportes</button>
+    <button class="filter-btn" onclick="filterCategory('tv', this)" tabindex="0">TV Gratis</button>
+    <button class="filter-btn" onclick="filterCategory('streaming', this)" tabindex="0">Streaming</button>
+    <button class="filter-btn" onclick="filterCategory('personal', this)" tabindex="0">Personal</button>
+  </nav>
+
   <div class="controls-bar">
-    <h2>Aplicaciones y Canales</h2>
+    <h2>Canales y Accesos Directos</h2>
     <button class="btn-action" onclick="openModal()" tabindex="0">+ Añadir Canal</button>
   </div>
 
   <main class="grid" id="appsContainer">
-    <!-- Películas y Streaming Integrados -->
-    <a href="https://cuevana3e.pro/" class="card" tabindex="0">
+    <!-- Películas y Cine -->
+    <a href="https://cuevana3e.pro/" class="card" data-category="cine" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=cuevana3e.pro&sz=128" alt="Icono">
         <span class="card-badge cine">Cine</span>
@@ -227,7 +384,7 @@
       <div class="card-title">Cuevana 3</div>
     </a>
 
-    <a href="https://peliculon-tv.vercel.app/" class="card" tabindex="0">
+    <a href="https://peliculon-tv.vercel.app/" class="card" data-category="cine" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=peliculon-tv.vercel.app&sz=128" alt="Icono">
         <span class="card-badge cine">Cine</span>
@@ -235,7 +392,7 @@
       <div class="card-title">Peliculon TV</div>
     </a>
 
-    <a href="https://splayer.lat/" class="card" tabindex="0">
+    <a href="https://splayer.lat/" class="card" data-category="cine" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=splayer.lat&sz=128" alt="Icono">
         <span class="card-badge cine">Cine & Deportes</span>
@@ -243,8 +400,8 @@
       <div class="card-title">SPlayer</div>
     </a>
 
-    <!-- Entretenimiento y Streaming Gratis -->
-    <a href="https://pluto.tv" class="card" tabindex="0">
+    <!-- Entretenimiento y TV Gratis -->
+    <a href="https://pluto.tv" class="card" data-category="tv" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
         <span class="card-badge tv">TV Gratis</span>
@@ -252,15 +409,7 @@
       <div class="card-title">Pluto TV</div>
     </a>
 
-    <a href="https://watch.plex.tv" class="card" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=plex.tv&sz=128" alt="Icono">
-        <span class="card-badge">Streaming</span>
-      </div>
-      <div class="card-title">Plex TV</div>
-    </a>
-
-    <a href="https://vix.com" class="card" tabindex="0">
+    <a href="https://vix.com" class="card" data-category="tv" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=vix.com&sz=128" alt="Icono">
         <span class="card-badge tv">TV Gratis</span>
@@ -268,7 +417,7 @@
       <div class="card-title">ViX Gratis</div>
     </a>
 
-    <a href="https://rakuten.tv" class="card" tabindex="0">
+    <a href="https://rakuten.tv" class="card" data-category="tv" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rakuten.tv&sz=128" alt="Icono">
         <span class="card-badge tv">TV Gratis</span>
@@ -276,7 +425,16 @@
       <div class="card-title">Rakuten TV</div>
     </a>
 
-    <a href="https://youtube.com/tv" class="card" tabindex="0">
+    <!-- Streaming -->
+    <a href="https://watch.plex.tv" class="card" data-category="streaming" tabindex="0">
+      <div class="card-header">
+        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=plex.tv&sz=128" alt="Icono">
+        <span class="card-badge">Streaming</span>
+      </div>
+      <div class="card-title">Plex TV</div>
+    </a>
+
+    <a href="https://youtube.com/tv" class="card" data-category="streaming" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
         <span class="card-badge">Streaming</span>
@@ -285,7 +443,7 @@
     </a>
 
     <!-- Deportes y Fútbol en Vivo -->
-    <a href="https://pluto.tv/on-demand/sports" class="card" tabindex="0">
+    <a href="https://pluto.tv/on-demand/sports" class="card" data-category="deportes" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
         <span class="card-badge deportes">Deportes</span>
@@ -293,7 +451,7 @@
       <div class="card-title">Pluto Deportes</div>
     </a>
 
-    <a href="https://www.youtube.com/results?search_query=futbol+en+vivo" class="card" tabindex="0">
+    <a href="https://www.youtube.com/results?search_query=futbol+en+vivo" class="card" data-category="deportes" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
         <span class="card-badge deportes">Deportes</span>
@@ -301,7 +459,7 @@
       <div class="card-title">Fútbol en Vivo (YT)</div>
     </a>
 
-    <a href="https://rtve.es/play/deportes" class="card" tabindex="0">
+    <a href="https://rtve.es/play/deportes" class="card" data-category="deportes" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rtve.es&sz=128" alt="Icono">
         <span class="card-badge deportes">Deportes</span>
@@ -310,12 +468,19 @@
     </a>
   </main>
 
-  <!-- Modal para Agregar/Editar -->
+  <!-- Modal -->
   <div class="modal" id="addModal">
     <div class="modal-content">
       <h3 id="modalTitle">Añadir Nuevo Canal</h3>
       <input type="text" id="appName" placeholder="Nombre (ej. Mi Canal)" tabindex="0">
       <input type="url" id="appUrl" placeholder="https://..." tabindex="0">
+      <select id="appCategory" tabindex="0">
+        <option value="personal">Personal</option>
+        <option value="cine">Cine</option>
+        <option value="deportes">Deportes</option>
+        <option value="tv">TV Gratis</option>
+        <option value="streaming">Streaming</option>
+      </select>
       <button class="btn-action" onclick="saveShortcut()" tabindex="0">Guardar</button>
       <button class="btn-action" style="background:transparent; color:white;" onclick="closeModal()" tabindex="0">Cancelar</button>
     </div>
@@ -323,6 +488,9 @@
 
   <script>
     let editIndex = null;
+
+    // REEMPLAZA ESTA URL CON TU DOMINIO OBTENIDO EN VERCEL
+    const VERCEL_API_URL = "https://mi-seekee-backend.vercel.app/api/search";
 
     function updateClock() {
       const now = new Date();
@@ -332,22 +500,88 @@
     setInterval(updateClock, 1000);
     updateClock();
 
+    function filterCategory(cat, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const cards = document.querySelectorAll('.card');
+      cards.forEach(card => {
+        const cardCat = card.getAttribute('data-category');
+        if (cat === 'all' || cardCat === cat) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    /* Consulta HTTP a la Serverless Function de Vercel */
+    async function runSeekeeSearch() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (!query) return;
+
+      const resultsView = document.getElementById('resultsView');
+      const resultsTitle = document.getElementById('resultsTitle');
+      const resultsContent = document.getElementById('resultsContent');
+
+      resultsTitle.textContent = `Buscando en la web: "${query}"...`;
+      resultsContent.innerHTML = '<p style="color:var(--text-muted); grid-column: 1/-1;">Conectando con el motor metabuscador...</p>';
+      resultsView.style.display = 'block';
+
+      try {
+        const response = await fetch(`${VERCEL_API_URL}?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        resultsContent.innerHTML = '';
+        resultsTitle.textContent = `Resultados metabuscador para: "${query}"`;
+
+        if (!data || data.length === 0) {
+          resultsContent.innerHTML = '<p style="color:white; grid-column: 1/-1;">No se encontraron resultados en la web para esta consulta.</p>';
+          return;
+        }
+
+        data.forEach(item => {
+          const card = document.createElement('a');
+          card.className = 'result-card';
+          card.tabIndex = 0;
+          card.href = item.url;
+          card.innerHTML = `
+            <span class="tag">${item.type || 'Web Stream'}</span>
+            <div class="title">${item.title}</div>
+            <div class="source">Fuente: ${item.source}</div>
+          `;
+          resultsContent.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error("Error consultando el metabuscador:", err);
+        resultsContent.innerHTML = '<p style="color:#fca5a5; grid-column: 1/-1;">Error al consultar el servidor en Vercel. Asegúrate de haber actualizado la constante VERCEL_API_URL.</p>';
+      }
+    }
+
+    function closeResults() {
+      document.getElementById('resultsView').style.display = 'none';
+    }
+
     function openModal(index = null) {
       editIndex = index;
       const modal = document.getElementById('addModal');
       const title = document.getElementById('modalTitle');
       const nameInput = document.getElementById('appName');
       const urlInput = document.getElementById('appUrl');
+      const catSelect = document.getElementById('appCategory');
 
       if (index !== null) {
         const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
         title.textContent = "Editar Canal";
         nameInput.value = saved[index].name;
         urlInput.value = saved[index].url;
+        catSelect.value = saved[index].category || 'personal';
       } else {
         title.textContent = "Añadir Nuevo Canal";
         nameInput.value = "";
         urlInput.value = "";
+        catSelect.value = 'personal';
       }
 
       modal.style.display = 'flex';
@@ -365,6 +599,7 @@
 
         const div = document.createElement('div');
         div.className = 'card';
+        div.setAttribute('data-category', app.category || 'personal');
         div.tabIndex = 0;
         div.onclick = (e) => {
           if (!e.target.classList.contains('btn-card-edit') && !e.target.classList.contains('btn-card-delete')) {
@@ -375,7 +610,7 @@
         div.innerHTML = `
           <div class="card-header">
             <img class="card-icon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=128" alt="Icono">
-            <span class="card-badge">Personal</span>
+            <span class="card-badge">${app.category || 'Personal'}</span>
           </div>
           <div class="card-title">${app.name}</div>
           <div class="card-actions">
@@ -390,14 +625,15 @@
     function saveShortcut() {
       const name = document.getElementById('appName').value;
       const url = document.getElementById('appUrl').value;
+      const category = document.getElementById('appCategory').value;
       if (!name || !url) return;
 
       const saved = JSON.parse(localStorage.getItem('custom_tv_apps') || '[]');
 
       if (editIndex !== null) {
-        saved[editIndex] = { name, url };
+        saved[editIndex] = { name, url, category };
       } else {
-        saved.push({ name, url });
+        saved.push({ name, url, category });
       }
 
       localStorage.setItem('custom_tv_apps', JSON.stringify(saved));
