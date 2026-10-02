@@ -53,7 +53,6 @@
     .clock-time { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
     .clock-date { font-size: 0.85rem; color: var(--text-muted); text-transform: capitalize; }
 
-    /* Buscador Global Estilo Seekee */
     .search-section {
       margin-bottom: 1.5rem;
     }
@@ -81,7 +80,6 @@
       outline: none;
     }
 
-    /* Vista de Resultados de Búsqueda Seekee */
     .results-view {
       display: none;
       background: rgba(15, 23, 42, 0.95);
@@ -151,7 +149,6 @@
       margin-top: 0.5rem;
     }
 
-    /* Filtros Superiores */
     .filter-bar {
       display: flex;
       gap: 0.75rem;
@@ -342,7 +339,6 @@
     </div>
   </header>
 
-  <!-- Buscador Global -->
   <section class="search-section">
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="Buscar películas, series o partidos en la web..." tabindex="0" onkeyup="if(event.key==='Enter') runSeekeeSearch()">
@@ -350,7 +346,6 @@
     </div>
   </section>
 
-  <!-- Menú de Resultados de Búsqueda Seekee -->
   <section class="results-view" id="resultsView">
     <div class="results-header">
       <h2 id="resultsTitle">Resultados Globales</h2>
@@ -359,7 +354,6 @@
     <div class="results-grid" id="resultsContent"></div>
   </section>
 
-  <!-- Filtros Superiores -->
   <nav class="filter-bar">
     <button class="filter-btn active" onclick="filterCategory('all', this)" tabindex="0">Todos</button>
     <button class="filter-btn" onclick="filterCategory('cine', this)" tabindex="0">Cine y Películas</button>
@@ -375,7 +369,6 @@
   </div>
 
   <main class="grid" id="appsContainer">
-    <!-- Películas y Cine -->
     <a href="https://cuevana3e.pro/" class="card" data-category="cine" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=cuevana3e.pro&sz=128" alt="Icono">
@@ -400,7 +393,6 @@
       <div class="card-title">SPlayer</div>
     </a>
 
-    <!-- Entretenimiento y TV Gratis -->
     <a href="https://pluto.tv" class="card" data-category="tv" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
@@ -425,7 +417,6 @@
       <div class="card-title">Rakuten TV</div>
     </a>
 
-    <!-- Streaming -->
     <a href="https://watch.plex.tv" class="card" data-category="streaming" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=plex.tv&sz=128" alt="Icono">
@@ -442,7 +433,6 @@
       <div class="card-title">YouTube TV</div>
     </a>
 
-    <!-- Deportes y Fútbol en Vivo -->
     <a href="https://pluto.tv/on-demand/sports" class="card" data-category="deportes" tabindex="0">
       <div class="card-header">
         <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
@@ -468,7 +458,6 @@
     </a>
   </main>
 
-  <!-- Modal -->
   <div class="modal" id="addModal">
     <div class="modal-content">
       <h3 id="modalTitle">Añadir Nuevo Canal</h3>
@@ -488,9 +477,7 @@
 
   <script>
     let editIndex = null;
-
-    // REEMPLAZA ESTA URL CON TU DOMINIO OBTENIDO EN VERCEL
-    const VERCEL_API_URL = "https://mi-seekee-backend.vercel.app/api/search";
+    const VERCEL_API_URL = "https://tv-three-lime.vercel.app/api/search";
 
     function updateClock() {
       const now = new Date();
@@ -515,7 +502,6 @@
       });
     }
 
-    /* Consulta HTTP a la Serverless Function de Vercel */
     async function runSeekeeSearch() {
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
@@ -555,7 +541,7 @@
 
       } catch (err) {
         console.error("Error consultando el metabuscador:", err);
-        resultsContent.innerHTML = '<p style="color:#fca5a5; grid-column: 1/-1;">Error al consultar el servidor en Vercel. Asegúrate de haber actualizado la constante VERCEL_API_URL.</p>';
+        resultsContent.innerHTML = '<p style="color:#fca5a5; grid-column: 1/-1;">Error al consultar el servidor en Vercel. Revisa la consola o la configuración del servidor.</p>';
       }
     }
 
@@ -649,7 +635,6 @@
     }
 
     loadCustomApps();
-    const VERCEL_API_URL = "https://tv-three-lime.vercel.app/api/search";
   </script>
 </body>
 </html>
