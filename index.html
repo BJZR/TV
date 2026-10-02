@@ -450,7 +450,10 @@
       </div>
       <div class="card-title">RTVE Deportes</div>
     </a>
+    .ver { position: fixed; right: .6rem; bottom: .5rem; font-size: .7rem; color: #5a6478; opacity: .55; z-index: 5; }
+    .ver:hover { opacity: 1; }
   </main>
+  <div class="ver" id="ver"></div>
 
   <div class="modal" id="addModal">
     <div class="modal-content">
@@ -491,7 +494,8 @@
       fetch('/resultados', { method: 'HEAD' })
         .then(r => { if (!r.ok) fallback(); })
         .catch(fallback);
-    })();
+    
+})();
 
     // ---------- Buscador ----------
     const form = $('form'), input = $('q'), sugBox = $('sug');
@@ -673,6 +677,13 @@
     }
 
     loadCustomApps();
-  </script>
+  
+    // Qué build está sirviendo esta página: si el número no cambia tras editar
+    // el código, el servidor viejo sigue ocupando el puerto.
+    fetch(API + '/api/version', { headers: { Accept: 'application/json' } })
+      .then(r => r.json())
+      .then(v => { const el = document.getElementById('ver'); if (el) el.textContent = 'tv v' + v.version + ' · ' + v.built; })
+      .catch(() => {});
+</script>
 </body>
 </html>

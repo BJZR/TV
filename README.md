@@ -26,26 +26,59 @@ ninguno habría encontrado solo.
 | Índice | Qué aporta |
 | --- | --- |
 | **DuckDuckGo** | el grueso de la web, en dos variantes (html y lite) |
-| **Wikipedia** | el nombre oficial, el año y los títulos alternativos |
+| **Brave** *(con clave)* | índice real de Brave: sin captchas, el plan gratuito son 2000 búsquedas al mes |
+| **Wikipedia** | el nombre oficial, el año y los títulos alternativos, en español e inglés |
 | **Internet Archive** | películas de dominio público que se pueden ver ahí mismo |
 | **Wiby** | un índice independiente: páginas personales y sitios olvidados |
 
 Las fuentes que fallan, piden captcha o tardan se saltan y la búsqueda sigue con los
-demás; la respuesta dice siempre en cuáles salió algo. Las sugerencias van
-ainstead más lejos: se consulta con seis autocompletados (DuckDuckGo, Google,
-Brave, Bing, Yahoo y Yandex) y se mezclan por acuerdo: la frase que proponen más
-buscadores es la que más gente escribe.
+demás; la respuesta dice siempre en cuáles salió algo.
+
+Las sugerencias van un paso más allá: se consulta con seis autocompletados
+(DuckDuckGo, Google, Brave, Bing, Yahoo y Yandex) y se mezclan por acuerdo: la
+frase que proponen más buscadores es la que más gente escribe.
 
 Las sugerencias se filtran: se descarta lo que no empieza por lo tecleado y lo
 que viene en alfabeto cirílico, que Yandex devuelve a menudo.
 
 ### Motores que no están
 
-Mojeek, Brave, Ecosia, Startpage, Yandex, Bing y las instancias públicas de
-SearXNG responden con captcha, challenge o 429 desde IPs de nube. No están en el
-registro a propósito: cuando están bloqueados solo suman espera. Si desde tu
-servidor alguno responde, se añade al registro (`webSources` en `sources.go`) y
-suma cobertura sin tocar nada más.
+Mojeek, Ecosia, Startpage, Yandex, Bing y las instancias públicas de SearXNG
+responden con captcha, challenge o 429 desde IPs de nube. No están en el registro
+a propósito: cuando están bloqueados solo suman espera. Si desde tu servidor
+alguno responde, se añade al registro (`webSources` en `sources.go`) y suma
+cobertura sin tocar nada más. Brave sí está, pero solo si hay clave (ver abajo).
+
+### Brave con clave (recomendado)
+
+```bash
+export BRAVE_API_KEY=tu_clave   # gratis en api-dashboard.search.brave.com
+go run .
+```
+
+Sin la clave no se consulta; con ella Brave entra el primero y deja de depender
+de que un buscador abierto nos deje pasar.
+
+### Cuando DuckDuckGo cierra la puerta
+
+Pide el desafío humano cuando ve demasiadas peticiones. Insistir solo alarga el
+castigo, así que el buscador tiene ritmo mínimo entre peticiones (1,2 s) y un
+cortacircuitos: cuando responde con el desafío se aparta 5 minutos (más si
+insiste) y la búsqueda la sostienen Wikipedia, Internet Archive, Wiby y Brave.
+Cuando vuelve a responder normal, se olvida el castigo.
+
+Mientras está cerrado, la API devuelve un aviso (`notice`) y la interfaz lo dice
+en pantalla: si solo aparecen cuatro resultados, es por eso y no porque la
+película no exista.
+
+## De dónde viene cada resultado
+
+No todos los índices valen lo mismo, y el título no es el único dato: un video
+subido por cualquiera a Internet Archive se llama igual que la película, pero no
+es la película. Cada origen tiene su peso (0,72 el archivo, 0,82 los sitios
+viejos, 1 el buscador y la enciclopedia) y se aplica al ordenar. Los índices sin
+voto siguen valiendo 1 hasta que se demuestre lo contrario: así, un buscador
+nuevo entra tocando una línea.
 
 ## Cómo decide el orden
 1. Limpia la consulta: saca año, rango de años, palabras de ruido ("ver", "en

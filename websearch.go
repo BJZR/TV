@@ -149,6 +149,8 @@ func hostOf(raw string) string {
 	if i := strings.IndexByte(h, ':'); i >= 0 {
 		h = h[:i]
 	}
+	// "www2.stage.netflix.com" es el mismo sitio que "netflix.com".
+	h = reSubDomain.ReplaceAllString(h, "")
 	return strings.TrimPrefix(h, "www.")
 }
 
@@ -296,7 +298,11 @@ var client = &http.Client{Timeout: webTimeout}
 
 // reLocale quita el prefijo de país de una ruta: justwatch.com/mx/pelicula/x y
 // justwatch.com/es/pelicula/x son la misma película.
-var reLocale = regexp.MustCompile(`^/[a-z]{2}(/|$)`)
+var (
+	reLocale    = regexp.MustCompile(`^/[a-z]{2}(/|$)`)
+	reSubDomain = regexp.MustCompile(`^www[0-9]+\.`)
+	reSubLang   = regexp.MustCompile(`^(es|en|de|fr|it|pt|nl|ru|pl|ja|zh|cat|eu|gl)\.(www\.)?`)
+)
 
 // samePage decide si dos URL apuntan a la misma página aunque cambien el
 // idioma o el país.
@@ -307,12 +313,23 @@ func samePage(a, b string) bool {
 	}
 	ua, ub := a, b
 	if u, err := url.Parse(a); err == nil {
-		ua = u.Host + reLocale.ReplaceAllString(u.Path, "$1")
+		ua = baseHost(u.Host) + reLocale.ReplaceAllString(u.Path, "$1")
 	}
 	if u, err := url.Parse(b); err == nil {
-		ub = u.Host + reLocale.ReplaceAllString(u.Path, "$1")
+		ub = baseHost(u.Host) + reLocale.ReplaceAllString(u.Path, "$1")
 	}
 	return ua != "" && ua == ub
+}
+
+// baseHost quita el prefijo de país e idioma: "es.wikipedia.org" y
+// "en.wikipedia.org" son la misma enciclopedia con la ficha en dos idiomas.
+func baseHost(h string) string {
+	h = strings.ToLower(h)
+	h = reSubLang.ReplaceAllString(h, "")
+	if i := strings.IndexByte(h, ':'); i >= 0 {
+		h = h[:i]
+	}
+	return strings.TrimPrefix(h, "www.")
 }
 
 // mergeResults junta las consultas de todas las variantes y quita duplicados.
@@ -475,11 +492,26 @@ func rankResults(rs []Result, p parsed) []Result {
 		}
 		// El tope es 140 y no 100 a propósito: si no, todo lo que coincide con
 		// el título empata a 100 y el orden deja de significar nada.
-		r.Score = math.Round(math.Min(160, r.Match+platformBonus(r)+snippetBonus(r)+voteBonus(r))*10) / 10
+		r.Score = math.Round(math.Min(160, (r.Match+platformBonus(r)+snippetBonus(r)+voteBonus(r))*sourceTrust(r))*10) / 10
 		out = append(out, r)
 	}
 	sortResults(out)
 	return capHosts(out)
+}
+
+// sourceTrust pesa según de dónde viene el resultado. Importa tanto como el
+// título: una ficha enciclopédica dice mucho más de una película que un video
+// que cualquiera subió a Internet Archive con el nombre de un perro.
+var trustBySource = map[string]float64{
+	"Internet Archive": 0.72, // videos de usuarios: ruido fácil
+	"Wiby":             0.82, // páginas personales y sitios olvidados
+}
+
+func sourceTrust(r Result) float64 {
+	if w, ok := trustBySource[r.Source]; ok {
+		return w
+	}
+	return 1
 }
 
 // sortResults ordena por puntuación y, a igualdad, por título para que sea

@@ -64,7 +64,7 @@ const (
 	cacheSugTTL   = 10 * time.Minute
 	cacheMax      = 256
 	requestTimout = 12 * time.Second
-	defaultLimit  = 24
+	defaultLimit  = 32
 	maxLimit      = 40
 	suggestLimit  = 6
 )

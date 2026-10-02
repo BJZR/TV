@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -1219,5 +1220,170 @@ func TestBraveConClave(t *testing.T) {
 	}
 	if rs[0].Snippet != "Ver The Matrix en línea" {
 		t.Errorf("resumen = %q", rs[0].Snippet)
+	}
+}
+
+func TestWikipediaNoRepiteLaPeliculaEnDosIdiomas(t *testing.T) {
+	f := newFakeEngine(t, ``, `[]`)
+	// El mismo artículo existe en español y en inglés.
+	f.serve("/es/wiki", `{"query":{"search":[{"title":"Matrix","snippet":"película de 1999"}]}}`)
+	f.serve("/en/wiki", `{"query":{"search":[{"title":"Matrix","snippet":"film from 1999"}]}}`)
+	f.point(t)
+	// El idioma va en la ruta, como en la wikipedia real.
+	oldAPI, oldSite := wikiAPI, wikiSite
+	wikiAPI, wikiSite = f.srv.URL+"/es/wiki", f.srv.URL+"/es/wiki/"
+	defer func() { wikiAPI, wikiSite = oldAPI, oldSite }()
+
+	rs, err := wikiSource(context.Background(), []string{"matrix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rs) != 1 {
+		t.Fatalf("la misma ficha no puede aparecer dos veces: %+v", rs)
+	}
+
+	// Y cada idioma se pide a su propia wikipedia.
+	for _, lang := range []string{wikiLang1, wikiLang2} {
+		uno, err := wikiLang(context.Background(), lang, "matrix")
+		if err != nil {
+			t.Fatalf("%s: %v", lang, err)
+		}
+		if !strings.Contains(uno[0].URL, "/"+lang+"/") {
+			t.Errorf("idioma %s pidió %s", lang, uno[0].URL)
+		}
+		if uno[0].Snippet == "" {
+			t.Errorf("idioma %s sin resumen", lang)
+		}
+	}
+}
+
+func TestBaseHostQuitaElIdioma(t *testing.T) {
+	for _, c := range [][2]string{
+		{"https://es.wikipedia.org/wiki/Matrix", "https://en.wikipedia.org/wiki/Matrix"},
+		{"https://es.example.com/pelicula/", "https://example.com/pelicula"},
+		{"https://es.example.com/pelicula", "https://example.com/pelicula"},
+	} {
+		if !samePage(c[0], c[1]) {
+			t.Errorf("samePage(%q, %q) = false, quiere true", c[0], c[1])
+		}
+	}
+	// Sitios distintos siguen siendo distintos.
+	if samePage("https://es.wikipedia.org/wiki/Matrix", "https://es.imdb.com/title/Matrix") {
+		t.Error("wikipedia e imdb no son la misma página")
+	}
+}
+
+func TestElIndiceImportaEnElOrden(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.point(t)
+	query := "chucky"
+
+	// Lo mismo, dicho por dos índices distintos.
+	rs := rankResults([]Result{
+		{Title: "Chucky", Host: "archive.org", Source: "Internet Archive"},
+		{Title: "Chucky", Host: "wikipedia.org", Source: "Wikipedia"},
+	}, parseQuery(query))
+	if rs[0].Source != "Wikipedia" {
+		t.Errorf("la ficha enciclopédica debe ir antes que un video subido: %+v", rs)
+	}
+	if rs[0].Score <= rs[1].Score {
+		t.Errorf("puntuaciones %v", rs)
+	}
+
+	// Un origen desconocido pesa lo mismo que el buscador principal.
+	if sourceTrust(Result{Source: "otro"}) != 1 {
+		t.Error("un índice nuevo debe valer 1 hasta que se sepa de él")
+	}
+}
+
+// ---------- La página no puede romperse en silencio ----------
+
+// reJSLookup encuentra los $('#algo') que el script usa para painting.
+var reJSLookup = regexp.MustCompile(`\$\('#([a-zA-Z0-9_-]+)'\)`)
+
+func TestLaPaginaJSNoSeRompeEnSilencio(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.point(t)
+	for _, page := range []struct{ path, name string }{
+		{"/", "index.html"},
+		{"/resultados", "catalog.html"},
+	} {
+		rec := httptest.NewRecorder()
+		pageHandler(page.path, page.name).ServeHTTP(rec, httptest.NewRequest("GET", page.path, nil))
+		body := rec.Body.String()
+		if rec.Code != http.StatusOK || body == "" {
+			t.Fatalf("%s: %d %d bytes", page.path, rec.Code, len(body))
+		}
+		// Todo elemento que el script busca por id tiene que existir.
+		for _, m := range reJSLookup.FindAllStringSubmatch(body, -1) {
+			if !strings.Contains(body, `id="`+m[1]+`"`) {
+				t.Errorf("%s: el script usa $('#%s') pero no hay ningún elemento con ese id", page.path, m[1])
+			}
+		}
+		// Y ninguna referencia a una variable que solo existe dentro de otra
+		// función: eso tira la búsqueda entera sin avisar.
+		if strings.Contains(body, "notice.textContent = data.") {
+			t.Errorf("%s: el aviso usa una variable que no existe al pintar", page.path)
+		}
+	}
+}
+
+func TestLaPaginaDiceQueVersionEs(t *testing.T) {
+	f := newFakeEngine(t, fixtureHTML, `[]`)
+	f.point(t)
+
+	rec := httptest.NewRecorder()
+	versionHandler(rec, httptest.NewRequest("GET", "/api/version", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("código %d", rec.Code)
+	}
+	var v struct{ Version, Built string }
+	if err := json.Unmarshal(rec.Body.Bytes(), &v); err != nil {
+		t.Fatal(err)
+	}
+	if v.Version == "" || v.Built == "" || strings.Contains(v.Built, "sin fecha") {
+		t.Errorf("versión incompleta: %+v", v)
+	}
+	// Y las dos páginas lo enseñan, que es de lo que se sirve el usuario para
+	// saber si lo que ve en pantalla es lo último.
+	for _, page := range []struct{ path, name string }{
+		{"/", "index.html"},
+		{"/resultados", "catalog.html"},
+	} {
+		rec = httptest.NewRecorder()
+		pageHandler(page.path, page.name).ServeHTTP(rec, httptest.NewRequest("GET", page.path, nil))
+		if !strings.Contains(rec.Body.String(), `id="ver"`) || !strings.Contains(rec.Body.String(), "/api/version") {
+			t.Errorf("%s no muestra la versión", page.path)
+		}
+	}
+}
+
+func TestLaEnciclopediaNoSeRepiteEnDosIdiomas(t *testing.T) {
+	f := newFakeEngine(t, ``, `[]`)
+	f.point(t)
+	// Una en español y otra en inglés: la película es la misma.
+	got := voteResults([]Result{
+		{URL: "https://es.wikipedia.org/wiki/Pulp_Fiction", Host: "es.wikipedia.org", Title: "Pulp Fiction", Source: "Wikipedia"},
+		{URL: "https://en.wikipedia.org/wiki/Pulp_Fiction", Host: "en.wikipedia.org", Title: "Pulp Fiction - Wikipedia", Source: "DuckDuckGo"},
+	}, []string{"Wikipedia", "DuckDuckGo"})
+	if len(got) != 1 {
+		t.Fatalf("fusión = %d resultados, quería 1: %+v", len(got), got)
+	}
+	if got[0].Votes != 2 {
+		t.Errorf("acuerdo = %d, quería 2", got[0].Votes)
+	}
+
+	// Pero dos películas distintas en la enciclopedia siguen siendo dos.
+	dos := voteResults([]Result{
+		{URL: "https://es.wikipedia.org/wiki/Matrix", Host: "es.wikipedia.org", Title: "Matrix", Source: "Wikipedia"},
+		{URL: "https://en.wikipedia.org/wiki/Matrix_Resurrection", Host: "en.wikipedia.org", Title: "Matrix Resurrection", Source: "Wikipedia"},
+	}, []string{"Wikipedia"})
+	if len(dos) != 2 {
+		t.Errorf("no debe fusionarMatrix con Matrix Resurrection: %+v", dos)
+	}
+
+	// El host raro de Netflix es el mismo sitio.
+	if hostOf("https://www2.stage.netflix.com/title/1") != "stage.netflix.com" {
+		t.Errorf("host = %q", hostOf("https://www2.stage.netflix.com/title/1"))
 	}
 }

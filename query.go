@@ -152,11 +152,22 @@ func (p parsed) webQueries() []string {
 		add(p.Query + " " + p.Year)
 	}
 	add(p.Query + " ver en línea")
+	// Las plataformas que la gente usa de verdad para ver películas. Sin esto el
+	// buscador solo devuelve lo que el índice_open web.rankea primero, y las
+	// webs de streaming Legal y pirata quedan enterradas. Es una consulta más
+	// al mismo buscador: ningún motor nuevo.
+	add(p.Query + " site:" + cuevanaSite)
 	if p.Kind == "tv" {
 		add(p.Query + " serie")
 	}
 	return out
 }
+
+// cuevanaSite es el sitio que más se echa de menos cuando no aparece nada.
+// Preguntar por él explícitamente es la diferencia: el buscador solo enseña lo
+// que tiene en su índice, y si nadie le pregunta por ese dominio, ese dominio
+// no sale.
+const cuevanaSite = "cuevana.com"
 
 // primary devuelve las consultas que siempre se prueban, incluido el año:
 // los buscadores lo usan para títulos numéricos como "Blade Runner 2049".

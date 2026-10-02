@@ -238,7 +238,10 @@
 
     <div class="list" id="list"></div>
     <p class="state" id="state"></p>
+    .ver { position: fixed; right: .6rem; bottom: .5rem; font-size: .7rem; color: #5a6478; opacity: .55; z-index: 5; }
+    .ver:hover { opacity: 1; }
   </main>
+  <div class="ver" id="ver"></div>
 
   <script>
   (() => {
@@ -317,7 +320,7 @@
       srcs.textContent = sources.length > 1
         ? 'Buscado en ' + sources.join(', ') + '. Si varios índices lo señalan, más seguro.'
         : '';
-      notice.textContent = data.notice || '';
+      notice.textContent = lastNotice;
       if (!all.length) {
         list.innerHTML = '';
         say('<b>Nada por ahora</b>Prueba con el título en el idioma original, o sin el año.');
@@ -367,7 +370,15 @@
 
     search(query);
     $('#q').focus();
-  })();
+  
+    // Qué build está sirviendo esta página: si el número no cambia tras editar
+    // el código, el servidor viejo sigue ocupando el puerto.
+    fetch(API + '/api/version', { headers: { Accept: 'application/json' } })
+      .then(r => r.json())
+      .then(v => { const el = document.getElementById('ver'); if (el) el.textContent = 'tv v' + v.version + ' · ' + v.built; })
+      .catch(() => {});
+
+})();
   </script>
 </body>
 </html>

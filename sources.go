@@ -25,7 +25,7 @@ import (
 
 const (
 	sourceTimeout = 5 * time.Second // por índice; el total lo manda requestTimout
-	maxPerHost    = 2               // ninguna plataforma se lleva la pantalla entera
+	maxPerHost    = 3               // ninguna plataforma monopoliza la pantalla
 	votePoints    = 7               // cada índice independiente que coincide suma
 )
 
@@ -191,7 +191,11 @@ func voteResults(all []Result, names []string) []Result {
 			// Misma URL, o mismo sitio con el mismo título: los buscadores
 			// devuelven la página varias veces con parámetros distintos.
 			mismo := samePage(r.URL, out[i].URL) ||
-				(r.Host == out[i].Host && fold(cleanTitle(r.Title)) == fold(cleanTitle(out[i].Title)))
+				(r.Host == out[i].Host && fold(cleanTitle(r.Title)) == fold(cleanTitle(out[i].Title))) ||
+				// La misma ficha de la enciclopedia en dos idiomas: "Pulp Fiction"
+				// en español y en inglés es una sola página, no dos resultados.
+				(isWiki(r.Host) && isWiki(out[i].Host) &&
+					fold(cleanTitle(r.Title)) == fold(cleanTitle(out[i].Title)))
 			if !mismo {
 				continue
 			}
@@ -314,10 +318,11 @@ func duckSource(ctx context.Context, queries []string) ([]Result, error) {
 	if ddgQuiet() {
 		return nil, errNoEngine // descansa: los otros índices cubren la búsqueda
 	}
-	// Con más índices, dos consultas bastan: pedir más solo multiplica las
-	// peticiones y hace que el buscador se cierre antes.
-	if len(queries) > 2 {
-		queries = queries[:2]
+	// El buscador solo devuelve una pantalla de resultados por consulta, así que
+	// cada variante extra son resultados extra. Van espaciadas (waitTurn) y el
+	// cortacircuitos sigue cortando si el buscador se queja.
+	if len(queries) > 4 {
+		queries = queries[:4]
 	}
 	var (
 		all   []Result
@@ -362,29 +367,49 @@ func wikiSource(ctx context.Context, queries []string) ([]Result, error) {
 	if len(queries) == 0 {
 		return nil, errNoEngine
 	}
-	var (
-		wg  sync.WaitGroup
-		mu  sync.Mutex
-		out []Result
-	)
-	for _, lang := range []string{wikiLang1, wikiLang2} {
+	// Las dos versiones son el mismo artículo, así que se guardan en orden fijo:
+	// primero la del idioma principal, que es la que se queda.
+	langs := []string{wikiLang1, wikiLang2}
+	partes := make([][]Result, len(langs))
+	var wg sync.WaitGroup
+	for i, lang := range langs {
 		wg.Add(1)
-		go func(lang string) {
+		go func(i int, lang string) {
 			defer wg.Done()
-			rs, err := wikiLang(ctx, lang, queries[0])
-			if err != nil {
-				return
+			if rs, err := wikiLang(ctx, lang, queries[0]); err == nil {
+				partes[i] = rs
 			}
-			mu.Lock()
-			out = append(out, rs...)
-			mu.Unlock()
-		}(lang)
+		}(i, lang)
 	}
 	wg.Wait()
-	if len(out) == 0 {
+
+	var all []Result
+	for _, parte := range partes {
+		for _, r := range parte {
+			// "Matrix" en español y en inglés son la misma ficha.
+			if anyTitle(all, r.Title) {
+				continue
+			}
+			all = append(all, r)
+		}
+	}
+	if len(all) == 0 {
 		return nil, errNoEngine
 	}
-	return out, nil
+	return all, nil
+}
+
+// isWiki dice si el host es de wikipedia, venga en el idioma que venga.
+func isWiki(h string) bool { return strings.Contains(h, "wikipedia.org") }
+
+func anyTitle(all []Result, title string) bool {
+	key := fold(cleanTitle(title))
+	for _, r := range all {
+		if fold(cleanTitle(r.Title)) == key {
+			return true
+		}
+	}
+	return false
 }
 
 func wikiLang(ctx context.Context, lang, query string) ([]Result, error) {

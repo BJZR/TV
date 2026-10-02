@@ -15,7 +15,15 @@ import (
 //go:embed index.html catalog.html
 var site embed.FS
 
+// La versión y la hora de arranque se ven en el log y en el pie de la página:
+// así se sabe de un vistazo si el navegador está viendo esta build y no una
+// anterior. La hora cambia en cada arranque; si no cambia, el servidor que
+// está sirviendo la página no se reinició.
+var version = "0.10.0"
+var buildStamp = time.Now().UTC().Format("2006-01-02 15:04:05")
+
 func main() {
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -24,6 +32,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/search", searchHandler)
 	mux.HandleFunc("/api/suggest", suggestHandler)
+	mux.HandleFunc("/api/version", versionHandler)
 	mux.HandleFunc("/resultados", pageHandler("/resultados", "catalog.html"))
 	mux.HandleFunc("/resultados/", pageHandler("/resultados", "catalog.html"))
 	mux.HandleFunc("/", homeHandler)
@@ -35,8 +44,18 @@ func main() {
 		WriteTimeout:      20 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("TV escuchando en :%s", port)
+	log.Printf("TV v%s escuchando en :%s (arrancado %s UTC)", version, port, buildStamp)
 	log.Fatal(srv.ListenAndServe())
+}
+
+// versionHandler dice qué build está sirviendo. La página la consulta al
+// cargarse y la muestra en el pie: si no coincide con lo que esperabas,
+// recargar es tan simple como F5.
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]string{
+		"version": version, "built": buildStamp + " UTC",
+	})
 }
 
 // homeHandler sirve la página (desde el binario, sin depender del disco) y
