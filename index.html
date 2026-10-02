@@ -138,6 +138,30 @@
       margin-bottom: 1.25rem;
     }
 
+    .results-hint { display: none; margin: -0.25rem 0 1rem; font-size: 0.9rem; color: var(--text-muted); }
+    .results-hint.show { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .results-hint button {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-color);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 0.3rem 0.7rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .results-grid mark { background: rgba(56, 189, 248, 0.28); color: #fff; border-radius: 3px; padding: 0 2px; }
+
+    .empty { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; }
+    .empty p { color: var(--text-muted); line-height: 1.5; }
+
+    .sk { pointer-events: none; }
+    .sk .poster-wrap { background: linear-gradient(90deg, #1e293b 25%, #273449 50%, #1e293b 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+    .sk .title, .sk .source { height: 0.8rem; border-radius: 6px; background: #263449; margin-bottom: 0.4rem; }
+    .sk .source { width: 55%; }
+    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { .sk .poster-wrap { animation: none; } }
+
     .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .chip {
       background: rgba(30, 41, 59, 0.8);
@@ -434,6 +458,7 @@
         <option value="year">Más recientes</option>
       </select>
     </div>
+    <div class="results-hint" id="resultsHint"></div>
     <div class="results-grid" id="resultsContent"></div>
   </section>
 
@@ -604,14 +629,36 @@
     function pushHistory(q) { setHistory([q, ...getHistory().filter(x => x.toLowerCase() !== q.toLowerCase())]); }
 
     // ---------- Estado ----------
-    let currentResults = [], currentFilter = 'all', currentSort = 'relevance';
+    let currentResults = [], currentFilter = 'all', currentSort = 'relevance', currentQuery = '';
     let searchCtl = null, suggestCtl = null, suggestItems = [], activeSuggest = -1, suggestTimer = null;
+    const suggestCache = new Map();
 
     async function api(path, params, signal) {
       const res = await fetch(`${API_BASE}${path}?${new URLSearchParams(params)}`, { signal });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
       return data;
+    }
+
+    // norm quita acentos para poder resaltar lo que el usuario escribió.
+    const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    function queryWords() {
+      return norm(currentQuery).split(/[^a-z0-9]+/).filter(w => w.length >= 2 && w.length < 30);
+    }
+
+    // highlight resalta (de forma segura) las palabras de la consulta.
+    function highlight(text) {
+      const words = queryWords();
+      if (!words.length) return esc(text);
+      return String(text ?? '').split(/(\s+)/).map(tok =>
+        tok.trim() && words.includes(norm(tok)) ? `<mark>${esc(tok)}</mark>` : esc(tok)
+      ).join('');
+    }
+
+    function skeletons(n = 8) {
+      return Array.from({ length: n }, () =>
+        `<div class="result-card sk"><div class="poster-wrap"></div><div class="info"><div class="title"></div><div class="source"></div></div></div>`).join('');
     }
 
     // ---------- Sugerencias ----------
@@ -673,16 +720,21 @@
       clearTimeout(suggestTimer);
       const q = $('searchInput').value.trim();
       if (q.length < 2) { suggestItems = []; renderSuggest(); return; }
+      if (suggestCache.has(q)) { suggestItems = suggestCache.get(q); renderSuggest(); return; }
+      suggestItems = [];
       suggestTimer = setTimeout(async () => {
         if (suggestCtl) suggestCtl.abort();
         suggestCtl = new AbortController();
         try {
-          const data = await api('/api/search', { q, limit: 6 }, suggestCtl.signal);
+          const data = await api('/api/suggest', { q, limit: 6 }, suggestCtl.signal);
           if ($('searchInput').value.trim() !== q) return;
-          suggestItems = data.results || [];
+          const items = data.results || [];
+          suggestCache.set(q, items);
+          if (suggestCache.size > 40) suggestCache.delete(suggestCache.keys().next().value);
+          suggestItems = items;
           renderSuggest();
         } catch (e) { if (e.name !== 'AbortError') hideSuggest(); }
-      }, 250);
+      }, 320);
     }
 
     // ---------- Búsqueda completa ----------
@@ -699,18 +751,24 @@
       if (searchCtl) searchCtl.abort();
       searchCtl = new AbortController();
 
+      currentQuery = query;
+      currentFilter = 'all';
       $('resultsTitle').textContent = `Buscando "${query}"...`;
-      $('resultsContent').innerHTML = '<p style="color:var(--text-muted); grid-column: 1/-1;">Consultando catálogo...</p>';
+      $('resultsContent').innerHTML = skeletons();
       $('resultChips').innerHTML = '';
+      $('resultsHint').className = 'results-hint';
+      $('resultsHint').innerHTML = '';
       $('resultsView').style.display = 'block';
 
       try {
         const data = await api('/api/search', { q: query, limit: 40 }, searchCtl.signal);
+        if ($('searchInput').value.trim() !== query) return;
         currentResults = data.results || [];
         currentFilter = 'all';
         $('resultsTitle').textContent = currentResults.length
           ? `${data.total} resultado${data.total === 1 ? '' : 's'} para "${query}"${data.year ? ' (' + data.year + ')' : ''}`
           : `Sin resultados para "${query}"`;
+        renderHint(data);
         renderResults();
         const first = $('resultsContent').querySelector('.result-card');
         if (first) first.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
@@ -719,8 +777,27 @@
         console.error('Error en la búsqueda:', err);
         $('resultsTitle').textContent = 'No se pudo completar la búsqueda';
         $('resultChips').innerHTML = '';
-        $('resultsContent').innerHTML = `<p style="color:#fca5a5; grid-column: 1/-1;">${esc(err.message)}</p>`;
+        $('resultsHint').className = 'results-hint';
+        $('resultsHint').innerHTML = '';
+        $('resultsContent').innerHTML = `<div class="empty"><p style="color:#fca5a5;">${esc(err.message)}</p></div>`;
       }
+    }
+
+    // renderHint avisa cuando el título encontrado es aproximado.
+    function renderHint(data) {
+      const hint = $('resultsHint');
+      const dym = data.didYouMean;
+      if (!dym || !currentResults.length) {
+        hint.className = 'results-hint';
+        hint.innerHTML = '';
+        return;
+      }
+      const msg = data.spellFixed
+        ? `No encontramos "${currentQuery}" exacto. ¿Quisiste decir`
+        : `La coincidencia más cercana es`;
+      hint.className = 'results-hint show';
+      hint.innerHTML = `<span>${esc(msg)} “${esc(dym)}”?</span><button type="button">Buscar así</button>`;
+      hint.querySelector('button').onclick = () => { $('searchInput').value = dym; runSearch(); };
     }
 
     function renderResults() {
@@ -738,7 +815,12 @@
       const grid = $('resultsContent');
       grid.innerHTML = '';
       if (!list.length) {
-        grid.innerHTML = '<p style="color:white; grid-column: 1/-1;">No se encontraron resultados. Prueba con otro título o revisa la ortografía.</p>';
+        const yt = safeUrl('https://www.youtube.com/results?search_query=' + encodeURIComponent(currentQuery));
+        grid.innerHTML = `<div class="empty">
+            <p>No encontramos nada para “${esc(currentQuery)}”.</p>
+            <p>Prueba con menos palabras, con el año (“${esc(currentQuery)} 2020”) o revisa la ortografía.</p>
+            <a class="btn-action" tabindex="0" href="${esc(yt)}" target="_blank" rel="noopener noreferrer">Buscar en YouTube</a>
+          </div>`;
         return;
       }
       list.forEach(it => {

@@ -361,14 +361,7 @@ func titleHandler(w http.ResponseWriter, r *http.Request) {
 	if !countryRe.MatchString(country) {
 		country = "CO"
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
-	defer cancel()
-
-	d, err := fetchDetails(ctx, typ, id, country)
-	if err != nil {
-		writeErr(w, err)
-		return
-	}
-	w.Header().Set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400")
-	writeJSON(w, http.StatusOK, d)
+	serveCached(w, "title|"+typ+"|"+strconv.Itoa(id)+"|"+country, detailTTL, func(ctx context.Context) (any, error) {
+		return fetchDetails(ctx, typ, id, country)
+	})
 }

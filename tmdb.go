@@ -108,6 +108,7 @@ type tmdbItem struct {
 	VoteAverage   float64    `json:"vote_average"`
 	VoteCount     int        `json:"vote_count"`
 	Popularity    float64    `json:"popularity"`
+	GenreIDs      []int      `json:"genre_ids"`
 	KnownFor      []tmdbItem `json:"known_for"`
 }
 
@@ -435,9 +436,11 @@ type Details struct {
 	Poster    string     `json:"poster,omitempty"`
 	Backdrop  string     `json:"backdrop,omitempty"`
 	Trailer   string     `json:"trailer,omitempty"`
+	TrailerID string     `json:"trailerId,omitempty"`
 	Country   string     `json:"country"`
 	WatchLink string     `json:"watchLink,omitempty"`
 	Providers []Provider `json:"providers"`
+	Sources   []Source   `json:"sources"`
 }
 
 type tmdbProv struct {
@@ -519,6 +522,7 @@ func fetchDetails(ctx context.Context, typ string, id int, country string) (*Det
 		}
 		if r > bestRank {
 			bestRank = r
+			out.TrailerID = v.Key
 			out.Trailer = "https://www.youtube.com/watch?v=" + url.QueryEscape(v.Key)
 		}
 	}
@@ -554,6 +558,7 @@ func fetchDetails(ctx context.Context, typ string, id int, country string) (*Det
 			}
 		}
 	}
+	out.Sources = buildSources(out.Title, out.Original, out.Year, typ, out.TrailerID)
 	return out, nil
 }
 

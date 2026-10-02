@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-//go:embed index.html
+//go:embed index.html catalog.html
 var site embed.FS
 
 func main() {
@@ -25,6 +25,11 @@ func main() {
 	mux.HandleFunc("/api/search", searchHandler)
 	mux.HandleFunc("/api/suggest", suggestHandler)
 	mux.HandleFunc("/api/title", titleHandler)
+	mux.HandleFunc("/api/browse", browseHandler)
+	mux.HandleFunc("/api/genres", genresHandler)
+	mux.HandleFunc("/api/featured", featuredHandler)
+	mux.HandleFunc("/api/similar", similarHandler)
+	mux.HandleFunc("/catalogo", pageHandler("/catalogo", "catalog.html"))
 	mux.HandleFunc("/", homeHandler)
 
 	srv := &http.Server{
@@ -45,19 +50,34 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	servePage(w, r, "index.html")
+}
+
+// pageHandler sirve una página embebida bajo /<path> y /<path>/.
+func pageHandler(path, name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != path && r.URL.Path != path+"/" {
+			http.NotFound(w, r)
+			return
+		}
+		servePage(w, r, name)
+	}
+}
+
+func servePage(w http.ResponseWriter, r *http.Request, name string) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	body, err := site.ReadFile("index.html")
+	body, err := site.ReadFile(name)
 	if err != nil {
 		http.Error(w, "no se encontró la página", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
-	http.ServeContent(w, r, "index.html", time.Time{}, strings.NewReader(string(body)))
+	http.ServeContent(w, r, name, time.Time{}, strings.NewReader(string(body)))
 }
 
 // compress reduce el tamaño de las respuestas JSON.
