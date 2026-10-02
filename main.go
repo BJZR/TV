@@ -24,13 +24,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/search", searchHandler)
 	mux.HandleFunc("/api/suggest", suggestHandler)
-	mux.HandleFunc("/api/title", titleHandler)
-	mux.HandleFunc("/api/browse", browseHandler)
-	mux.HandleFunc("/api/genres", genresHandler)
-	mux.HandleFunc("/api/featured", featuredHandler)
-	mux.HandleFunc("/api/similar", similarHandler)
-	mux.HandleFunc("/catalogo", pageHandler("/catalogo", "catalog.html"))
-	mux.HandleFunc("/catalogo/", pageHandler("/catalogo", "catalog.html"))
+	mux.HandleFunc("/resultados", pageHandler("/resultados", "catalog.html"))
+	mux.HandleFunc("/resultados/", pageHandler("/resultados", "catalog.html"))
 	mux.HandleFunc("/", homeHandler)
 
 	srv := &http.Server{

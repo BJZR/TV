@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart TV Hub Launcher</title>
+  <title>TV · Buscador de películas</title>
   <style>
     :root {
       --bg-gradient: linear-gradient(135deg, #0b1120 0%, #151f32 100%);
@@ -242,6 +242,74 @@
       background: #0f172a;
       color: white;
     }
+    /* ---------- Buscador ---------- */
+    .hero { max-width: 900px; margin: 0 auto 2.5rem; text-align: center; }
+    .hero h2 { font-size: 1.9rem; margin-bottom: .4rem; }
+    .hero p { color: var(--text-muted); margin-bottom: 1.4rem; }
+
+    .searchbar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      background: rgba(15, 23, 42, .85);
+      border: 1px solid rgba(56, 189, 248, .35);
+      border-radius: 14px;
+      padding: .55rem .6rem .55rem 1rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, .35);
+    }
+    .searchbar:focus-within { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(56, 189, 248, .18); }
+    .searchbar input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 1.1rem;
+      padding: .55rem 0;
+    }
+    .searchbar input::placeholder { color: #64748b; }
+    .searchbar button {
+      background: var(--accent-color);
+      color: #0b1120;
+      border: none;
+      border-radius: 10px;
+      padding: .65rem 1.4rem;
+      font-weight: 700;
+      font-size: .95rem;
+      cursor: pointer;
+    }
+    .searchbar button:hover { background: #7dd3fc; }
+
+    .sug {
+      position: absolute;
+      top: calc(100% + .5rem);
+      left: 0; right: 0;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 12px;
+      list-style: none;
+      overflow: hidden;
+      text-align: left;
+      z-index: 40;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, .5);
+    }
+    .sug li { border-bottom: 1px solid rgba(255, 255, 255, .06); }
+    .sug li:last-child { border-bottom: none; }
+    .sug button {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--text-main);
+      text-align: left;
+      padding: .7rem .9rem;
+      font-size: .95rem;
+      cursor: pointer;
+    }
+    .sug button:hover, .sug li.on button { background: rgba(56, 189, 248, .16); }
+    .sug .hint { color: var(--text-muted); font-size: .8rem; display: block; }
+
   </style>
 </head>
 <body>
@@ -257,13 +325,25 @@
     </div>
 
     <div class="head-right">
-      <a class="goto-cat" href="/catalogo" tabindex="0">Ver catálogo</a>
+      <a class="goto-cat" href="/resultados" tabindex="0">Ver resultados</a>
       <div class="clock-container">
         <div class="clock-time" id="clock">00:00</div>
         <div class="clock-date" id="date">--</div>
       </div>
     </div>
   </header>
+
+
+  <section class="hero">
+    <h2>Busca cualquier película</h2>
+    <p>Escribe el nombre y buscamos en toda la web dónde verla.</p>
+    <form class="searchbar" id="form" autocomplete="off">
+      <input id="q" type="search" placeholder="Escribe el nombre de la película…"
+             aria-label="Buscar película" enterkeyhint="search" tabindex="0">
+      <button type="submit" tabindex="0">Buscar</button>
+      <ul class="sug" id="sug" hidden></ul>
+    </form>
+  </section>
 
   <nav class="filter-bar">
     <button class="filter-btn active" onclick="filterCategory('all', this)" tabindex="0">Todos</button>
@@ -394,18 +474,87 @@
     const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : "#"; } catch { return "#"; } };
     const STORAGE_KEY = 'custom_tv_apps';
 
-    // El catálogo vive en /catalogo cuando lo sirve el binario de Go. Si la
-    // página se abre como archivo suelto o en un hosting estático, esa ruta
+    // Los resultados viven en /resultados cuando lo sirve el binario de Go. Si
+    // la página se abre como archivo suelto o en un hosting estático, esa ruta
     // daría 404, así que se cae al archivo real.
     (function () {
       const link = document.querySelector('.goto-cat');
       if (!link) return;
       const fallback = () => { link.href = 'catalog.html'; };
       if (location.protocol === 'file:') return fallback();
-      fetch('/catalogo', { method: 'HEAD' })
+      fetch('/resultados', { method: 'HEAD' })
         .then(r => { if (!r.ok) fallback(); })
         .catch(fallback);
     })();
+
+    // ---------- Buscador ----------
+    const form = $('form'), input = $('q'), sugBox = $('sug');
+    let sugTimer = null, sugItems = [], sugAt = -1;
+
+    // La URL de resultados se toma del enlace del encabezado, que ya sabe si
+    // está el servidor Go o hay que usar el archivo suelto.
+    function resultsURL(q) {
+      const link = document.querySelector('.goto-cat');
+      return (link ? link.href : '/resultados') + '?q=' + encodeURIComponent(q);
+    }
+
+    function go(q) {
+      q = String(q || '').trim();
+      if (q) location.href = resultsURL(q);
+    }
+
+    function hideSug() { sugBox.hidden = true; sugBox.innerHTML = ''; sugItems = []; sugAt = -1; }
+
+    function drawSug() {
+      if (!sugItems.length) return hideSug();
+      sugBox.innerHTML = sugItems.map((t, i) =>
+        `<li><button type="button" data-i="${i}" tabindex="0">${esc(t)}<span class="hint">buscar</span></button></li>`
+      ).join('');
+      sugBox.hidden = false;
+      sugAt = -1;
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      go(sugAt >= 0 ? sugItems[sugAt] : input.value);
+    });
+
+    input.addEventListener('input', () => {
+      clearTimeout(sugTimer);
+      const q = input.value.trim();
+      if (q.length < 2) return hideSug();
+      sugTimer = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/suggest?q=' + encodeURIComponent(q));
+          const data = await res.json();
+          sugItems = data.results || [];
+          drawSug();
+        } catch { hideSug(); }
+      }, 180);
+    });
+
+    input.addEventListener('keydown', e => {
+      if (sugBox.hidden || !sugItems.length) return;
+      const lis = [...sugBox.querySelectorAll('li')];
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        sugAt = (sugAt + (e.key === 'ArrowDown' ? 1 : sugItems.length - 1)) % sugItems.length;
+        lis.forEach((li, i) => li.classList.toggle('on', i === sugAt));
+      } else if (e.key === 'Escape') {
+        hideSug();
+      }
+    });
+
+    sugBox.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (b) go(sugItems[+b.dataset.i]);
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.searchbar')) hideSug();
+    });
+
+    input.focus();
 
     function updateClock() {
       const now = new Date();

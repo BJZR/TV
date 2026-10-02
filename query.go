@@ -130,6 +130,34 @@ func (p parsed) valid() bool {
 	return n >= minQueryRunes || (n == 1 && p.Kind != "")
 }
 
+// webQueries son las consultas que se mandan al buscador web: primero el título
+// tal cual y después las variantes que encuentran la película para ver, que es
+// lo que la gente escribe cuando busca una película.
+func (p parsed) webQueries() []string {
+	var out []string
+	add := func(s string) {
+		s = strings.Join(strings.Fields(s), " ")
+		if s == "" {
+			return
+		}
+		for _, q := range out {
+			if q == s {
+				return
+			}
+		}
+		out = append(out, s)
+	}
+	add(p.Query)
+	if p.Year != "" {
+		add(p.Query + " " + p.Year)
+	}
+	add(p.Query + " ver en línea")
+	if p.Kind == "tv" {
+		add(p.Query + " serie")
+	}
+	return out
+}
+
 // primary devuelve las consultas que siempre se prueban (incluye el año, que
 // TMDB sí usa para títulos numéricos como "Blade Runner 2049").
 func (p parsed) primary() []string {

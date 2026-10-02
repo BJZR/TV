@@ -6,50 +6,45 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
-	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
+// Result es una página de la web donde aparece la película: el buscador la
+// devuelve tal cual, con su plataforma y su resumen para que se entienda de
+// qué se trata sin abrir el enlace.
 type Result struct {
-	ID            int     `json:"id,omitempty"`
-	Type          string  `json:"type"` // movie | tv | live
-	Title         string  `json:"title"`
-	OriginalTitle string  `json:"originalTitle,omitempty"`
-	Year          string  `json:"year,omitempty"`
-	Overview      string  `json:"overview,omitempty"`
-	Poster        string  `json:"poster,omitempty"`
-	Backdrop      string  `json:"backdrop,omitempty"`
-	Rating        float64 `json:"rating,omitempty"`
-	Votes         int     `json:"votes,omitempty"`
-	URL           string  `json:"url,omitempty"`
-	Source        string  `json:"source"`
-	Via           string  `json:"via,omitempty"`
-	Score         float64 `json:"score"`
-	Match         float64 `json:"-"`
+	Title    string  `json:"title"`
+	URL      string  `json:"url"`
+	Host     string  `json:"host"`
+	Snippet  string  `json:"snippet,omitempty"`
+	Year     string  `json:"year,omitempty"`
+	Platform string  `json:"platform,omitempty"`
+	Kind     string  `json:"kind"` // web | plataforma | video | info
+	Favicon  string  `json:"favicon,omitempty"`
+	Source   string  `json:"source"`
+	Score    float64 `json:"score"`
+	Match    float64 `json:"-"`
 }
 
 type SearchResponse struct {
 	Query      string   `json:"query"`
-	Year       string   `json:"year,omitempty"`
 	Total      int      `json:"total"`
 	Results    []Result `json:"results"`
-	DidYouMean string   `json:"didYouMean,omitempty"`
-	SpellFixed bool     `json:"spellFixed,omitempty"`
+	Suggestion string   `json:"suggestion,omitempty"`
+	Engine     string   `json:"engine,omitempty"`
 }
 
 // ---------- Caché LRU con TTL y respaldo de datos viejos ----------
 
 type cacheItem struct {
 	key     string
-	cands   []*candidate
+	rs      []Result
 	at      time.Time
 	ttl     time.Duration
-	partial bool // solo búsqueda rápida: vale menos
+	partial bool // solo sugerencias: vale menos
 }
 
 var (
@@ -59,25 +54,20 @@ var (
 )
 
 const (
-	cacheTTL         = 30 * time.Minute
-	cacheStaleTTL    = 6 * time.Hour
-	cacheNegTTL      = 2 * time.Minute
-	cacheSuggestTTL  = 5 * time.Minute
-	cacheMax         = 256
-	fetchTimeout     = 5 * time.Second
-	requestTimeout   = 9 * time.Second
-	defaultLimit     = 24
-	maxLimit         = 40
-	suggestLimit     = 6
-	liveResultScore  = 82
-	liveScoreFloor   = 28
-	spellFixMinChars = 4
-	spellFixScore    = 70
+	cacheTTL      = 30 * time.Minute
+	cacheStaleTTL = 6 * time.Hour
+	cacheNegTTL   = 2 * time.Minute
+	cacheSugTTL   = 10 * time.Minute
+	cacheMax      = 256
+	requestTimout = 12 * time.Second
+	defaultLimit  = 24
+	maxLimit      = 40
+	suggestLimit  = 6
 )
 
-// cacheGet devuelve candidatos frescos. allowPartial acepta los que salieron de
-// una búsqueda rápida (sugerencias), que pueden quedarse cortos.
-func cacheGet(key string, allowPartial bool) ([]*candidate, bool) {
+// cacheGet devuelve resultados frescos. allowPartial acepta los que salieron
+// de una búsqueda rápida (sugerencias), que pueden quedarse cortos.
+func cacheGet(key string, allowPartial bool) ([]Result, bool) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	el, ok := cacheMap[key]
@@ -92,12 +82,12 @@ func cacheGet(key string, allowPartial bool) ([]*candidate, bool) {
 		return nil, false
 	}
 	cacheLRU.MoveToFront(el)
-	return it.cands, true
+	return it.rs, true
 }
 
-// cacheStale devuelve candidatos vencidos para no dejar al usuario sin respuesta
-// cuando TMDB falla.
-func cacheStale(key string) ([]*candidate, bool) {
+// cacheStale devuelve resultados vencidos para no dejar al usuario sin
+// respuesta cuando el buscador falla.
+func cacheStale(key string) ([]Result, bool) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	el, ok := cacheMap[key]
@@ -110,10 +100,10 @@ func cacheStale(key string) ([]*candidate, bool) {
 		delete(cacheMap, key)
 		return nil, false
 	}
-	return it.cands, true
+	return it.rs, true
 }
 
-func cacheSet(key string, cands []*candidate, ttl time.Duration, partial bool) {
+func cacheSet(key string, rs []Result, ttl time.Duration, partial bool) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	if el, ok := cacheMap[key]; ok {
@@ -122,7 +112,7 @@ func cacheSet(key string, cands []*candidate, ttl time.Duration, partial bool) {
 		if partial && !it.partial && time.Since(it.at) <= it.ttl {
 			return
 		}
-		it.cands, it.at, it.partial = cands, time.Now(), partial
+		it.rs, it.at, it.partial = rs, time.Now(), partial
 		if !partial {
 			it.ttl = ttl
 		}
@@ -135,7 +125,7 @@ func cacheSet(key string, cands []*candidate, ttl time.Duration, partial bool) {
 			delete(cacheMap, back.Value.(*cacheItem).key)
 		}
 	}
-	cacheMap[key] = cacheLRU.PushFront(&cacheItem{key: key, cands: cands, at: time.Now(), ttl: ttl, partial: partial})
+	cacheMap[key] = cacheLRU.PushFront(&cacheItem{key: key, rs: rs, at: time.Now(), ttl: ttl, partial: partial})
 }
 
 func cacheFlush() {
@@ -148,9 +138,9 @@ func cacheFlush() {
 // ---------- Una sola petición por consulta a la vez ----------
 
 type call struct {
-	done  chan struct{}
-	cands []*candidate
-	err   error
+	done chan struct{}
+	rs   []Result
+	err  error
 }
 
 var (
@@ -159,13 +149,13 @@ var (
 )
 
 // fetchShared reutiliza el trabajo en curso de la misma consulta.
-func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([]*candidate, error)) ([]*candidate, error) {
+func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([]Result, error)) ([]Result, error) {
 	flightMu.Lock()
 	if c, ok := flights[key]; ok {
 		flightMu.Unlock()
 		select {
 		case <-c.done:
-			return c.cands, c.err
+			return c.rs, c.err
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
@@ -176,15 +166,15 @@ func fetchShared(ctx context.Context, key string, fetch func(context.Context) ([
 
 	// El trabajo no depende del cliente que llegó primero: si se va, los demás
 	// siguen esperando el mismo resultado.
-	fctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
-	c.cands, c.err = fetch(fctx)
+	fctx, cancel := context.WithTimeout(context.Background(), requestTimout)
+	c.rs, c.err = fetch(fctx)
 	cancel()
 	close(c.done)
 
 	flightMu.Lock()
 	delete(flights, key)
 	flightMu.Unlock()
-	return c.cands, c.err
+	return c.rs, c.err
 }
 
 // ---------- Búsqueda ----------
@@ -194,35 +184,25 @@ func cacheKey(p parsed) string {
 	if p.Year != "" {
 		k += "#" + p.Year
 	}
-	if p.From > 0 {
-		k += "#" + strconv.Itoa(p.From) + "-" + strconv.Itoa(p.To)
-	}
 	return k
 }
 
-// candidates devuelve los candidatos de TMDB usando caché y peticiones agrupadas.
-func candidates(ctx context.Context, p parsed, quick bool) ([]*candidate, error) {
+// results busca en la web con caché y peticiones agrupadas.
+func results(ctx context.Context, p parsed) ([]Result, error) {
 	key := cacheKey(p)
-	if c, ok := cacheGet(key, quick); ok {
-		return c, nil
+	if rs, ok := cacheGet(key, true); ok {
+		return rs, nil
 	}
-	flightKey := key
-	if quick {
-		flightKey += "|q"
-	}
-	c, err := fetchShared(ctx, flightKey, func(ctx context.Context) ([]*candidate, error) {
-		return fetchCandidates(ctx, p, quick)
+	rs, err := fetchShared(ctx, key, func(ctx context.Context) ([]Result, error) {
+		return searchWeb(ctx, p)
 	})
 	if err == nil {
 		ttl := cacheTTL
-		if quick {
-			ttl = cacheSuggestTTL
+		if len(rs) == 0 {
+			ttl = cacheNegTTL // no castigar al buscador por consultas sin resultados
 		}
-		if len(c) == 0 {
-			ttl = cacheNegTTL // no castigar a TMDB por búsquedas sin resultados
-		}
-		cacheSet(key, c, ttl, quick)
-		return c, nil
+		cacheSet(key, rs, ttl, false)
+		return rs, nil
 	}
 	if stale, ok := cacheStale(key); ok {
 		return stale, nil
@@ -230,45 +210,24 @@ func candidates(ctx context.Context, p parsed, quick bool) ([]*candidate, error)
 	return nil, err
 }
 
-// liveResult arma el acceso directo a la transmisión.
-func liveResult(q string) Result {
-	return Result{
-		Type: "live", Title: "Ver en vivo: " + q, Source: "YouTube", Via: "YouTube",
-		URL:   "https://www.youtube.com/results?search_query=" + url.QueryEscape(q+" en vivo"),
-		Score: liveResultScore, Match: 0,
-	}
-}
-
-func runSearch(ctx context.Context, rawQuery string, limit int, quick bool) (*SearchResponse, error) {
+func runSearch(ctx context.Context, rawQuery string, limit int) (*SearchResponse, error) {
 	p := parseQuery(rawQuery)
-	resp := &SearchResponse{Query: p.Query, Year: p.Year, Results: []Result{}}
+	resp := &SearchResponse{Query: p.Query, Engine: "DuckDuckGo", Results: []Result{}}
 	if !p.valid() {
 		return resp, nil
 	}
 
-	cands, err := candidates(ctx, p, quick)
+	rs, err := results(ctx, p)
 	if err != nil {
 		return nil, err
 	}
-	results := rank(cands, p)
+	ranked := rankResults(rs, p)
 
-	if p.Live {
-		// Búsqueda deportiva: si el catálogo no responde, solo el directo en vivo.
-		if bestMatchText(results) < liveScoreFloor {
-			results = nil
-		}
-		results = append(results, liveResult(p.Query))
-		sort.SliceStable(results, func(i, j int) bool { return results[i].Score > results[j].Score })
-	} else if len(results) > 0 && results[0].Match < spellFixScore && len([]rune(p.Fold)) >= spellFixMinChars {
-		// Coincidencia aproximada (errata o título parecido): propone el más cercano.
-		resp.DidYouMean, resp.SpellFixed = results[0].Title, true
+	resp.Total = len(ranked)
+	if limit > 0 && len(ranked) > limit {
+		ranked = ranked[:limit]
 	}
-
-	resp.Total = len(results)
-	if limit > 0 && len(results) > limit {
-		results = results[:limit]
-	}
-	resp.Results = results
+	resp.Results = ranked
 	return resp, nil
 }
 
@@ -283,15 +242,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeErr(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, errNoKey):
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	case errors.Is(err, errRate):
-		w.Header().Set("Retry-After", "20")
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "TMDB está recibiendo muchas consultas, inténtalo en un momento"})
 	case errors.Is(err, context.DeadlineExceeded):
-		writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": "TMDB tardó demasiado en responder"})
+		writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": "El buscador tardó demasiado en responder"})
+	case errors.Is(err, errNoEngine):
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "No se pudo consultar el buscador"})
 	default:
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "No se pudo consultar TMDB"})
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "No se pudo consultar el buscador"})
 	}
 }
 
@@ -313,55 +269,43 @@ func parseLimit(r *http.Request, def, max int) int {
 	return def
 }
 
-func handleSearch(quick bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if cors(w, r) {
-			return
-		}
-		def, max := defaultLimit, maxLimit
-		ttl := 300
-		if quick {
-			def, max, ttl = suggestLimit, 12, 120
-		}
-		limit := parseLimit(r, def, max)
-
-		ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
-		defer cancel()
-
-		resp, err := runSearch(ctx, r.URL.Query().Get("q"), limit, quick)
-		if err != nil {
-			writeErr(w, err)
-			return
-		}
-		w.Header().Set("Cache-Control", "public, s-maxage="+strconv.Itoa(ttl)+", stale-while-revalidate=600")
-		writeJSON(w, http.StatusOK, resp)
-	}
-}
-
-func searchHandler(w http.ResponseWriter, r *http.Request) { handleSearch(false)(w, r) }
-
-func suggestHandler(w http.ResponseWriter, r *http.Request) { handleSearch(true)(w, r) }
-
-var countryRe = regexp.MustCompile(`^[A-Z]{2}$`)
-
-func titleHandler(w http.ResponseWriter, r *http.Request) {
+func searchHandler(w http.ResponseWriter, r *http.Request) {
 	if cors(w, r) {
 		return
 	}
-	typ := r.URL.Query().Get("type")
-	id, err := strconv.Atoi(r.URL.Query().Get("id"))
-	if (typ != "movie" && typ != "tv") || err != nil || id <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "parámetros type e id inválidos"})
+	limit := parseLimit(r, defaultLimit, maxLimit)
+
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimout)
+	defer cancel()
+
+	resp, err := runSearch(ctx, r.URL.Query().Get("q"), limit)
+	if err != nil {
+		writeErr(w, err)
 		return
 	}
-	country := strings.ToUpper(r.URL.Query().Get("country"))
-	if !countryRe.MatchString(country) {
-		country = strings.ToUpper(r.Header.Get("X-Vercel-IP-Country"))
+	w.Header().Set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600")
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// suggestHandler devuelve lo que la gente suele escribir a partir de lo tecleado.
+func suggestHandler(w http.ResponseWriter, r *http.Request) {
+	if cors(w, r) {
+		return
 	}
-	if !countryRe.MatchString(country) {
-		country = "CO"
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(q)) < 2 {
+		writeJSON(w, http.StatusOK, map[string]any{"query": q, "results": []string{}})
+		return
 	}
-	serveCached(w, "title|"+typ+"|"+strconv.Itoa(id)+"|"+country, detailTTL, func(ctx context.Context) (any, error) {
-		return fetchDetails(ctx, typ, id, country)
-	})
+
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimout)
+	defer cancel()
+
+	out, err := suggestWeb(ctx, q)
+	if err != nil && len(out) == 0 {
+		writeErr(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, s-maxage=600")
+	writeJSON(w, http.StatusOK, map[string]any{"query": q, "results": out})
 }
