@@ -6,26 +6,33 @@
   <!-- Dominio del backend. Vacío = mismo dominio que esta página.
        Ejemplo: https://tv-api.vercel.app -->
   <meta name="tv-api" content="">
-  <title>TV · Resultados</title>
+  <title>TV · Resultados de Búsqueda</title>
   <style>
     :root {
-      --bg: #070b14;
+      --bg: #090d16;
       --card: #0f172a;
-      --line: rgba(255, 255, 255, 0.09);
+      --card-hover: #162036;
+      --line: rgba(255, 255, 255, 0.08);
       --acc: #38bdf8;
-      --acc2: #a78bfa;
-      --text: #f1f5f9;
+      --acc-glow: rgba(56, 189, 248, 0.25);
+      --acc-video: #a78bfa;
+      --text: #f8fafc;
       --muted: #94a3b8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: radial-gradient(1100px 620px at 78% -12%, #14213d 0%, var(--bg) 62%);
+      background: radial-gradient(1100px 620px at 50% -10%, #172554 0%, var(--bg) 70%);
       color: var(--text);
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
-      padding: 1.6rem clamp(1rem, 4vw, 3rem) 4rem;
+      padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem;
+    }
+
+    .container {
+      max-width: 1050px;
+      margin: 0 auto;
     }
 
     .top {
@@ -33,56 +40,63 @@
       align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
-      padding-bottom: 1.1rem;
+      padding-bottom: 1.25rem;
       border-bottom: 1px solid var(--line);
     }
 
     .exit {
       display: inline-flex;
       align-items: center;
-      gap: .5rem;
-      background: rgba(56, 189, 248, .12);
+      gap: 0.5rem;
+      background: rgba(56, 189, 248, 0.12);
       color: var(--acc);
-      border: 1px solid rgba(56, 189, 248, .3);
-      padding: .65rem 1rem;
-      border-radius: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 0.6rem 1rem;
+      border-radius: 12px;
       font-weight: 600;
+      font-size: 0.9rem;
       text-decoration: none;
       white-space: nowrap;
+      transition: all 0.2s ease;
     }
-    .exit:hover { background: var(--acc); color: #08111f; }
+    .exit:hover, .exit:focus { background: var(--acc); color: #090d16; outline: none; }
 
     .searchbar {
       flex: 1;
       min-width: 260px;
       display: flex;
       align-items: center;
-      gap: .5rem;
-      background: rgba(15, 23, 42, .9);
+      gap: 0.5rem;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: .45rem .5rem .45rem 1rem;
+      border-radius: 14px;
+      padding: 0.45rem 0.5rem 0.45rem 1rem;
+      transition: all 0.2s ease;
     }
-    .searchbar:focus-within { border-color: var(--acc); }
+    .searchbar:focus-within { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-glow); }
     .searchbar input {
       flex: 1;
       background: none;
       border: none;
       outline: none;
       color: var(--text);
-      font-size: 1rem;
-      padding: .5rem 0;
+      font-size: 1.05rem;
+      padding: 0.45rem 0;
     }
     .searchbar input::placeholder { color: #64748b; }
     .searchbar button {
       background: var(--acc);
-      color: #08111f;
+      color: #090d16;
       border: none;
-      border-radius: 9px;
-      padding: .55rem 1.15rem;
+      border-radius: 10px;
+      padding: 0.6rem 1.25rem;
       font-weight: 700;
+      font-size: 0.95rem;
       cursor: pointer;
+      transition: all 0.15s ease;
     }
+    .searchbar button:hover { background: #7dd3fc; }
 
     .head {
       display: flex;
@@ -90,157 +104,182 @@
       justify-content: space-between;
       gap: 1rem;
       flex-wrap: wrap;
-      margin: 1.6rem 0 .9rem;
+      margin: 1.8rem 0 1rem;
     }
-    .head h1 { font-size: clamp(1.25rem, 3vw, 1.7rem); letter-spacing: -.4px; }
+    .head h1 { font-size: clamp(1.3rem, 3vw, 1.8rem); font-weight: 800; letter-spacing: -0.5px; }
     .head h1 b { color: var(--acc); }
-    .count { color: var(--muted); font-size: .9rem; }
-    .srcs { color: var(--muted); font-size: .82rem; margin-top: .15rem; }
-    .tag.ok { background: #14361f; color: #7ee2a8; }
-    .notice { color: #e8c07a; font-size: .84rem; margin-top: .1rem; }
+    .count { color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+    .srcs { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; width: 100%; }
+    .notice { color: #fde047; font-size: 0.85rem; margin-top: 0.2rem; display: block; }
 
-    .tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
+    .tabs { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
     .tab {
       background: var(--card);
       color: var(--muted);
       border: 1px solid var(--line);
-      padding: .5rem 1rem;
+      padding: 0.55rem 1.1rem;
       border-radius: 999px;
       font-weight: 600;
-      font-size: .88rem;
+      font-size: 0.88rem;
       cursor: pointer;
+      transition: all 0.2s ease;
     }
-    .tab.on { background: var(--acc); color: #08111f; border-color: var(--acc); }
-    .tab:hover:not(.on) { color: var(--text); }
+    .tab.on { background: var(--acc); color: #090d16; border-color: var(--acc); font-weight: 700; }
+    .tab:hover:not(.on) { color: var(--text); border-color: rgba(255, 255, 255, 0.2); }
 
-    .list { display: grid; gap: .75rem; }
+    .list { display: grid; gap: 0.85rem; }
 
     .res {
       display: grid;
-      grid-template-columns: 46px 1fr auto;
-      gap: 1rem;
+      grid-template-columns: 48px 1fr auto;
+      gap: 1.1rem;
       align-items: center;
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 1rem 1.1rem;
-      transition: border-color .15s, transform .15s, background .15s;
+      border-radius: 16px;
+      padding: 1.1rem 1.25rem;
+      transition: all 0.2s ease;
     }
-    .res:hover { border-color: rgba(56, 189, 248, .5); transform: translateY(-2px); background: #111d33; }
+    .res:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+      background: var(--card-hover);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
 
     .ico {
-      width: 46px;
-      height: 46px;
+      width: 48px;
+      height: 48px;
       border-radius: 12px;
       background: #1e293b;
       object-fit: contain;
-      padding: 5px;
+      padding: 6px;
     }
 
     .meta { min-width: 0; }
     .t {
-      font-weight: 600;
-      font-size: 1.03rem;
+      font-weight: 700;
+      font-size: 1.08rem;
       line-height: 1.35;
       display: flex;
       align-items: center;
-      gap: .5rem;
+      gap: 0.5rem;
       flex-wrap: wrap;
     }
-    .t span.txt { overflow: hidden; text-overflow: ellipsis; }
+    .t span.txt { overflow: hidden; text-overflow: ellipsis; color: var(--text); }
     .snip {
       color: var(--muted);
-      font-size: .88rem;
-      margin-top: .3rem;
+      font-size: 0.9rem;
+      margin-top: 0.35rem;
+      line-height: 1.45;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .src { color: #64748b; font-size: .8rem; margin-top: .35rem; }
+    .src { color: #64748b; font-size: 0.8rem; margin-top: 0.4rem; font-weight: 500; }
 
     .tag {
-      font-size: .7rem;
+      font-size: 0.68rem;
       font-weight: 700;
-      letter-spacing: .3px;
+      letter-spacing: 0.4px;
       text-transform: uppercase;
-      padding: .18rem .5rem;
+      padding: 0.2rem 0.55rem;
       border-radius: 6px;
       border: 1px solid transparent;
       white-space: nowrap;
     }
-    .tag.plataforma { background: rgba(56, 189, 248, .16); color: var(--acc); border-color: rgba(56, 189, 248, .35); }
-    .tag.video { background: rgba(167, 139, 250, .16); color: var(--acc2); border-color: rgba(167, 139, 250, .35); }
-    .tag.info { background: rgba(148, 163, 184, .14); color: var(--muted); border-color: var(--line); }
-    .tag.web { background: rgba(255, 255, 255, .06); color: #cbd5e1; border-color: var(--line); }
-    .tag.yr { font-variant-numeric: tabular-nums; }
+    .tag.plataforma { background: rgba(56, 189, 248, 0.16); color: var(--acc); border-color: rgba(56, 189, 248, 0.3); }
+    .tag.video { background: rgba(167, 139, 250, 0.18); color: var(--acc-video); border-color: rgba(167, 139, 250, 0.35); }
+    .tag.info { background: rgba(148, 163, 184, 0.14); color: var(--muted); border-color: var(--line); }
+    .tag.web { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; border-color: var(--line); }
+    .tag.ok { background: rgba(34, 197, 94, 0.18); color: #4ade80; border-color: rgba(34, 197, 94, 0.3); }
+    .tag.yr { font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, 0.08); color: var(--muted); }
 
     .go {
-      background: rgba(56, 189, 248, .12);
-      color: var(--acc);
-      border: 1px solid rgba(56, 189, 248, .3);
-      padding: .6rem 1rem;
+      background: var(--acc);
+      color: #090d16;
+      border: 1px solid var(--acc);
+      padding: 0.65rem 1.25rem;
       border-radius: 10px;
-      font-weight: 600;
-      font-size: .88rem;
+      font-weight: 700;
+      font-size: 0.92rem;
       text-decoration: none;
       white-space: nowrap;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
-    .go:hover { background: var(--acc); color: #08111f; }
+    .go:hover, .go:focus {
+      background: #7dd3fc;
+      border-color: #7dd3fc;
+      box-shadow: 0 0 15px var(--acc-glow);
+    }
+    .go.video-go {
+      background: #a78bfa;
+      border-color: #a78bfa;
+      color: #090d16;
+    }
+    .go.video-go:hover { background: #c084fc; border-color: #c084fc; }
 
     .state {
       color: var(--muted);
       text-align: center;
-      padding: 3.5rem 1rem;
+      padding: 4rem 1rem;
       line-height: 1.6;
     }
-    .state b { color: var(--text); display: block; font-size: 1.1rem; margin-bottom: .4rem; }
+    .state b { color: var(--text); display: block; font-size: 1.2rem; margin-bottom: 0.5rem; }
     .state .spin {
-      width: 26px; height: 26px; margin: 0 auto 1rem;
-      border: 3px solid rgba(56, 189, 248, .25);
+      width: 30px; height: 30px; margin: 0 auto 1.2rem;
+      border: 3px solid rgba(56, 189, 248, 0.2);
       border-top-color: var(--acc);
       border-radius: 50%;
-      animation: sp .8s linear infinite;
+      animation: sp 0.8s linear infinite;
     }
     @keyframes sp { to { transform: rotate(360deg); } }
 
+    .ver { position: fixed; right: 0.8rem; bottom: 0.6rem; font-size: 0.75rem; color: #64748b; opacity: 0.7; z-index: 5; }
+    .ver:hover { opacity: 1; }
+
     @media (max-width: 640px) {
-      .res { grid-template-columns: 40px 1fr; }
-      .go { grid-column: 1 / -1; text-align: center; }
+      .res { grid-template-columns: 40px 1fr; gap: 0.8rem; }
+      .go { grid-column: 1 / -1; justify-content: center; width: 100%; text-align: center; margin-top: 0.3rem; }
       .exit span { display: none; }
     }
   </style>
 </head>
 <body>
 
-  <header class="top">
-    <a class="exit" href="/" title="Volver al launcher">← <span>Launcher</span></a>
-    <form class="searchbar" id="form" autocomplete="off">
-      <input id="q" type="search" placeholder="Película a buscar…" aria-label="Buscar película" tabindex="0">
-      <button type="submit" tabindex="0">Buscar</button>
-    </form>
-  </header>
+  <div class="container">
+    <header class="top">
+      <a class="exit" href="/" title="Volver al launcher">← <span>Launcher</span></a>
+      <form class="searchbar" id="form" autocomplete="off">
+        <input id="q" type="search" placeholder="Buscar películas, series o videos…" aria-label="Buscar películas o videos" tabindex="0">
+        <button type="submit" tabindex="0">Buscar</button>
+      </form>
+    </header>
 
-  <main>
-    <div class="head">
-      <h1 id="title">Resultados</h1>
-      <span class="count" id="count"></span>
-      <span class="srcs" id="srcs"></span>
-      <span class="notice" id="notice"></span>
-    </div>
+    <main>
+      <div class="head">
+        <h1 id="title">Resultados</h1>
+        <span class="count" id="count"></span>
+        <span class="srcs" id="srcs"></span>
+        <span class="notice" id="notice"></span>
+      </div>
 
-    <nav class="tabs" id="tabs">
-      <button class="tab on" data-k="all" tabindex="0">Todo</button>
-      <button class="tab" data-k="plataforma" tabindex="0">Plataformas</button>
-      <button class="tab" data-k="video" tabindex="0">Video</button>
-      <button class="tab" data-k="info" tabindex="0">Ficha y info</button>
-    </nav>
+      <nav class="tabs" id="tabs">
+        <button class="tab on" data-k="all" tabindex="0">Todo</button>
+        <button class="tab" data-k="video" tabindex="0">Videos y Stream</button>
+        <button class="tab" data-k="plataforma" tabindex="0">Plataformas</button>
+        <button class="tab" data-k="info" tabindex="0">Ficha e Info</button>
+      </nav>
 
-    <div class="list" id="list"></div>
-    <p class="state" id="state"></p>
-    .ver { position: fixed; right: .6rem; bottom: .5rem; font-size: .7rem; color: #5a6478; opacity: .55; z-index: 5; }
-    .ver:hover { opacity: 1; }
-  </main>
+      <div class="list" id="list"></div>
+      <p class="state" id="state"></p>
+    </main>
+  </div>
+
   <div class="ver" id="ver"></div>
 
   <script>
@@ -272,7 +311,7 @@
     let all = [], sources = [], lastNotice = '', filter = 'all', token = 0;
 
     function say(html) { state.innerHTML = html; state.hidden = !html; }
-    function loading() { list.innerHTML = ''; say('<span class="spin"></span>Buscando en la web…'); }
+    function loading() { list.innerHTML = ''; say('<span class="spin"></span>Buscando videos y enlaces en toda la web…'); }
 
     async function search(q) {
       query = q.trim();
@@ -284,7 +323,7 @@
         srcs.textContent = '';
         notice.textContent = '';
         list.innerHTML = '';
-        say('<b>Escribe el nombre de una película</b>Arriba tienes el buscador. Escribe el título y te digo dónde verla.');
+        say('<b>Escribe el nombre de lo que quieres ver</b>Arriba tienes el buscador. Escribe el título y te mostramos todos los enlaces.');
         return;
       }
       title.innerHTML = 'Resultados de <b>' + esc(query) + '</b>';
@@ -318,34 +357,40 @@
       const rs = visible();
       count.textContent = all.length ? rs.length + ' de ' + all.length : '';
       srcs.textContent = sources.length > 1
-        ? 'Buscado en ' + sources.join(', ') + '. Si varios índices lo señalan, más seguro.'
+        ? 'Buscado en ' + sources.join(', ') + '. Búsqueda global en toda la web.'
         : '';
       notice.textContent = lastNotice;
       if (!all.length) {
         list.innerHTML = '';
-        say('<b>Nada por ahora</b>Prueba con el título en el idioma original, o sin el año.');
+        say('<b>Sin resultados por ahora</b>Prueba con el título en el idioma original o sin el año.');
         return;
       }
       if (!rs.length) {
         list.innerHTML = '';
-        say('<b>Sin resultados de este tipo</b>Cambia el filtro para ver los demás.');
+        say('<b>Sin resultados en esta categoría</b>Cambia el filtro arriba para ver todos los demás enlaces.');
         return;
       }
       say('');
-      list.innerHTML = rs.map(r => `
+      list.innerHTML = rs.map(r => {
+        const isVid = r.kind === 'video';
+        const actionText = isVid ? '▶ Ver video ↗' : (r.platform ? 'Ver en ' + esc(r.platform) + ' ↗' : 'Abrir ↗');
+        const btnClass = isVid ? 'go video-go' : 'go';
+
+        return `
         <article class="res">
           <img class="ico" src="${esc(r.favicon || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="meta">
             <div class="t"><span class="txt">${esc(r.title)}</span>
               ${r.platform ? `<span class="tag ${esc(TAGS[r.kind] || 'web')}">${esc(r.platform)}</span>` : ''}
               ${r.year ? `<span class="tag yr">${esc(r.year)}</span>` : ''}
-              ${r.votes > 1 ? `<span class="tag ok">${r.votes} índices</span>` : ''}
+              ${r.votes > 1 ? `<span class="tag ok">${r.votes} fuentes</span>` : ''}
             </div>
             ${r.snippet ? `<p class="snip">${esc(r.snippet)}</p>` : ''}
             <p class="src">${esc(r.host)}</p>
           </div>
-          <a class="go" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>
-        </article>`).join('');
+          <a class="${btnClass}" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${actionText}</a>
+        </article>`;
+      }).join('');
     }
 
     $('#form').addEventListener('submit', e => {
@@ -370,7 +415,7 @@
 
     search(query);
     $('#q').focus();
-  
+
     // Qué build está sirviendo esta página: si el número no cambia tras editar
     // el código, el servidor viejo sigue ocupando el puerto.
     fetch(API + '/api/version', { headers: { Accept: 'application/json' } })
@@ -378,7 +423,7 @@
       .then(v => { const el = document.getElementById('ver'); if (el) el.textContent = 'tv v' + v.version + ' · ' + v.built; })
       .catch(() => {});
 
-})();
+  })();
   </script>
 </body>
 </html>

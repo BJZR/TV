@@ -6,12 +6,14 @@
   <!-- Dominio del backend. Vacío = mismo dominio que esta página.
        Ejemplo: https://tv-api.vercel.app -->
   <meta name="tv-api" content="">
-  <title>TV · Buscador de películas</title>
+  <title>TV · Buscador y Launcher</title>
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0b1120 0%, #151f32 100%);
-      --card-bg: rgba(30, 41, 59, 0.7);
-      --accent-color: #38bdf8;
+      --bg: #090d16;
+      --card-bg: rgba(21, 32, 54, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
     }
@@ -19,91 +21,193 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: var(--bg-gradient);
+      background: radial-gradient(1200px 800px at 50% -10%, #172554 0%, var(--bg) 70%);
       color: var(--text-main);
-      font-family: system-ui, -apple-system, sans-serif;
-      padding: 2rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 2rem 1.5rem 4rem;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
     }
 
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 2.5rem;
+      width: 100%;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 0.85rem;
     }
 
     .brand-icon {
-      width: 44px;
-      height: 44px;
-      background: var(--accent-color);
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+      box-shadow: 0 0 20px var(--accent-glow);
     }
 
-    .brand-icon svg { width: 26px; height: 26px; fill: #0b1120; }
-    .brand-text h1 { font-size: 1.6rem; font-weight: 700; }
-    .head-right { display: flex; align-items: center; gap: 1.25rem; }
+    .brand-icon svg { width: 24px; height: 24px; fill: #090d16; }
+    .brand-text h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+
+    .head-right { display: flex; align-items: center; gap: 1.5rem; }
     .clock-container { text-align: right; }
-    .clock-time { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
-    .clock-date { font-size: 0.85rem; color: var(--text-muted); text-transform: capitalize; }
+    .clock-time { font-size: 1.6rem; font-weight: 700; color: var(--text-main); line-height: 1; }
+    .clock-date { font-size: 0.8rem; color: var(--text-muted); text-transform: capitalize; margin-top: 2px; }
 
     .goto-cat {
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent-color);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      padding: 0.7rem 1.1rem;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 0.6rem 1rem;
       border-radius: 10px;
       font-weight: 600;
+      font-size: 0.9rem;
       text-decoration: none;
       white-space: nowrap;
+      transition: all 0.2s ease;
     }
 
     .goto-cat:hover, .goto-cat:focus {
-      background: var(--accent-color);
-      color: #0b1120;
+      background: var(--accent);
+      color: #090d16;
+      border-color: var(--accent);
       outline: none;
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+      box-shadow: 0 0 15px var(--accent-glow);
     }
 
+    /* ---------- Buscador Principal ---------- */
+    .hero {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto 3rem;
+      text-align: center;
+    }
+    .hero h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -0.5px; }
+    .hero p { color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.8rem; }
+
+    .searchbar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 16px;
+      padding: 0.6rem 0.6rem 0.6rem 1.25rem;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+    }
+    .searchbar:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-glow), 0 15px 40px rgba(0, 0, 0, 0.5);
+    }
+    .searchbar input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 1.15rem;
+      padding: 0.5rem 0;
+    }
+    .searchbar input::placeholder { color: #64748b; }
+    .searchbar button {
+      background: var(--accent);
+      color: #090d16;
+      border: none;
+      border-radius: 12px;
+      padding: 0.75rem 1.6rem;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .searchbar button:hover, .searchbar button:focus {
+      background: #7dd3fc;
+      outline: none;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .sug {
+      position: absolute;
+      top: calc(100% + 0.6rem);
+      left: 0; right: 0;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      list-style: none;
+      overflow: hidden;
+      text-align: left;
+      z-index: 50;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+    }
+    .sug li { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .sug li:last-child { border-bottom: none; }
+    .sug button {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--text-main);
+      text-align: left;
+      padding: 0.85rem 1.1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .sug button:hover, .sug li.on button { background: rgba(56, 189, 248, 0.16); }
+    .sug .hint { color: var(--text-muted); font-size: 0.8rem; font-weight: 500; }
+
+    /* ---------- Filtros y Canales ---------- */
     .filter-bar {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.6rem;
       margin-bottom: 2rem;
       overflow-x: auto;
       padding-bottom: 0.5rem;
     }
 
     .filter-btn {
-      background: rgba(30, 41, 59, 0.8);
+      background: rgba(15, 23, 42, 0.7);
       color: var(--text-muted);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 0.6rem 1.25rem;
-      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      padding: 0.6rem 1.2rem;
+      border-radius: 12px;
       font-weight: 600;
+      font-size: 0.9rem;
       cursor: pointer;
       outline: none;
       white-space: nowrap;
+      transition: all 0.2s ease;
     }
 
     .filter-btn.active {
-      background: var(--accent-color);
-      color: #0b1120;
-      border-color: var(--accent-color);
+      background: var(--accent);
+      color: #090d16;
+      border-color: var(--accent);
+      font-weight: 700;
     }
 
-    .filter-btn:focus {
-      border-color: white;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    .filter-btn:hover:not(.active), .filter-btn:focus {
+      border-color: rgba(56, 189, 248, 0.5);
+      color: var(--text-main);
     }
 
     .controls-bar {
@@ -113,37 +217,45 @@
       margin-bottom: 1.5rem;
     }
 
+    .controls-bar h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
     .btn-action {
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent-color);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      padding: 0.75rem 1.25rem;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 0.6rem 1.1rem;
       border-radius: 10px;
       font-weight: 600;
+      font-size: 0.88rem;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.4rem;
       outline: none;
+      transition: all 0.2s ease;
     }
 
-    .btn-action:focus {
-      background: var(--accent-color);
-      color: #0b1120;
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+    .btn-action:hover, .btn-action:focus {
+      background: var(--accent);
+      color: #090d16;
+      box-shadow: 0 0 15px var(--accent-glow);
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 1.25rem;
     }
 
     .card {
       background: var(--card-bg);
-      border: 2px solid rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
       border-radius: 16px;
-      padding: 1.25rem;
+      padding: 1.2rem;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -151,15 +263,15 @@
       color: var(--text-main);
       transition: all 0.2s ease;
       outline: none;
-      min-height: 140px;
+      min-height: 135px;
       position: relative;
     }
 
-    .card:focus {
-      border-color: var(--accent-color);
-      transform: scale(1.05);
-      background: rgba(51, 65, 85, 0.9);
-      box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.3);
+    .card:hover, .card:focus {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+      background: rgba(30, 41, 59, 0.85);
+      box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.25);
     }
 
     .card-header {
@@ -171,8 +283,8 @@
     }
 
     .card-icon {
-      width: 44px;
-      height: 44px;
+      width: 40px;
+      height: 40px;
       border-radius: 10px;
       object-fit: cover;
       background: #0f172a;
@@ -181,19 +293,20 @@
     .card-badge {
       font-size: 0.65rem;
       font-weight: 700;
-      padding: 0.25rem 0.5rem;
+      padding: 0.25rem 0.55rem;
       border-radius: 6px;
       text-transform: uppercase;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.08);
       color: var(--text-muted);
+      letter-spacing: 0.5px;
     }
 
-    .card-badge.deportes { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-    .card-badge.tv { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; }
-    .card-badge.cine { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .card-badge.deportes { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+    .card-badge.tv { background: rgba(56, 189, 248, 0.18); color: #7dd3fc; }
+    .card-badge.cine { background: rgba(168, 85, 247, 0.18); color: #c084fc; }
 
     .card-title {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 600;
       margin-top: auto;
     }
@@ -222,6 +335,7 @@
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(6px);
       align-items: center;
       justify-content: center;
       z-index: 200;
@@ -230,229 +344,179 @@
     .modal-content {
       background: #1e293b;
       padding: 2rem;
-      border-radius: 16px;
+      border-radius: 20px;
       width: 90%;
-      max-width: 400px;
+      max-width: 420px;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 1.1rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     }
 
+    .modal-content h3 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+
     .modal-content input, .modal-content select {
-      padding: 0.75rem;
-      border-radius: 8px;
+      padding: 0.8rem;
+      border-radius: 10px;
       border: 1px solid #475569;
       background: #0f172a;
       color: white;
-    }
-    /* ---------- Buscador ---------- */
-    .hero { max-width: 900px; margin: 0 auto 2.5rem; text-align: center; }
-    .hero h2 { font-size: 1.9rem; margin-bottom: .4rem; }
-    .hero p { color: var(--text-muted); margin-bottom: 1.4rem; }
-
-    .searchbar {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      background: rgba(15, 23, 42, .85);
-      border: 1px solid rgba(56, 189, 248, .35);
-      border-radius: 14px;
-      padding: .55rem .6rem .55rem 1rem;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, .35);
-    }
-    .searchbar:focus-within { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(56, 189, 248, .18); }
-    .searchbar input {
-      flex: 1;
-      background: none;
-      border: none;
+      font-size: 0.95rem;
       outline: none;
-      color: var(--text-main);
-      font-size: 1.1rem;
-      padding: .55rem 0;
     }
-    .searchbar input::placeholder { color: #64748b; }
-    .searchbar button {
-      background: var(--accent-color);
-      color: #0b1120;
-      border: none;
-      border-radius: 10px;
-      padding: .65rem 1.4rem;
-      font-weight: 700;
-      font-size: .95rem;
-      cursor: pointer;
+    .modal-content input:focus, .modal-content select:focus {
+      border-color: var(--accent);
     }
-    .searchbar button:hover { background: #7dd3fc; }
 
-    .sug {
-      position: absolute;
-      top: calc(100% + .5rem);
-      left: 0; right: 0;
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, .12);
-      border-radius: 12px;
-      list-style: none;
-      overflow: hidden;
-      text-align: left;
-      z-index: 40;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, .5);
-    }
-    .sug li { border-bottom: 1px solid rgba(255, 255, 255, .06); }
-    .sug li:last-child { border-bottom: none; }
-    .sug button {
-      display: block;
-      width: 100%;
-      background: none;
-      border: none;
-      color: var(--text-main);
-      text-align: left;
-      padding: .7rem .9rem;
-      font-size: .95rem;
-      cursor: pointer;
-    }
-    .sug button:hover, .sug li.on button { background: rgba(56, 189, 248, .16); }
-    .sug .hint { color: var(--text-muted); font-size: .8rem; display: block; }
+    .ver { position: fixed; right: 0.8rem; bottom: 0.6rem; font-size: 0.75rem; color: #64748b; opacity: 0.7; z-index: 5; }
+    .ver:hover { opacity: 1; }
 
+    @media (max-width: 640px) {
+      body { padding: 1.25rem 1rem 3rem; }
+      .hero h2 { font-size: 1.6rem; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+      .clock-container { display: none; }
+    }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="brand">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+        </div>
+        <div class="brand-text">
+          <h1>TV Launcher</h1>
+        </div>
       </div>
-      <div class="brand-text">
-        <h1>TV Launcher</h1>
+
+      <div class="head-right">
+        <a class="goto-cat" href="/resultados" tabindex="0">Ver resultados</a>
+        <div class="clock-container">
+          <div class="clock-time" id="clock">00:00</div>
+          <div class="clock-date" id="date">--</div>
+        </div>
       </div>
+    </header>
+
+    <section class="hero">
+      <h2>Busca películas, series y videos</h2>
+      <p>Encuentra enlaces directos en toda la web sin límites ni registros.</p>
+      <form class="searchbar" id="form" autocomplete="off">
+        <input id="q" type="search" placeholder="Escribe lo que quieres ver…"
+               aria-label="Buscar películas o videos" enterkeyhint="search" tabindex="0">
+        <button type="submit" tabindex="0">Buscar</button>
+        <ul class="sug" id="sug" hidden></ul>
+      </form>
+    </section>
+
+    <nav class="filter-bar">
+      <button class="filter-btn active" onclick="filterCategory('all', this)" tabindex="0">Todos</button>
+      <button class="filter-btn" onclick="filterCategory('cine', this)" tabindex="0">Cine y Películas</button>
+      <button class="filter-btn" onclick="filterCategory('deportes', this)" tabindex="0">Fútbol y Deportes</button>
+      <button class="filter-btn" onclick="filterCategory('tv', this)" tabindex="0">TV Gratis</button>
+      <button class="filter-btn" onclick="filterCategory('streaming', this)" tabindex="0">Streaming</button>
+      <button class="filter-btn" onclick="filterCategory('personal', this)" tabindex="0">Personal</button>
+    </nav>
+
+    <div class="controls-bar">
+      <h2>Canales y Accesos Directos</h2>
+      <button class="btn-action" onclick="openModal()" tabindex="0">+ Añadir Canal</button>
     </div>
 
-    <div class="head-right">
-      <a class="goto-cat" href="/resultados" tabindex="0">Ver resultados</a>
-      <div class="clock-container">
-        <div class="clock-time" id="clock">00:00</div>
-        <div class="clock-date" id="date">--</div>
-      </div>
-    </div>
-  </header>
+    <main class="grid" id="appsContainer">
+      <a href="https://cuevana3e.pro/" class="card" data-category="cine" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=cuevana3e.pro&sz=128" alt="Icono">
+          <span class="card-badge cine">Cine</span>
+        </div>
+        <div class="card-title">Cuevana 3</div>
+      </a>
 
+      <a href="https://peliculon-tv.vercel.app/" class="card" data-category="cine" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=peliculon-tv.vercel.app&sz=128" alt="Icono">
+          <span class="card-badge cine">Cine</span>
+        </div>
+        <div class="card-title">Peliculon TV</div>
+      </a>
 
-  <section class="hero">
-    <h2>Busca cualquier película</h2>
-    <p>Escribe el nombre y buscamos en toda la web dónde verla.</p>
-    <form class="searchbar" id="form" autocomplete="off">
-      <input id="q" type="search" placeholder="Escribe el nombre de la película…"
-             aria-label="Buscar película" enterkeyhint="search" tabindex="0">
-      <button type="submit" tabindex="0">Buscar</button>
-      <ul class="sug" id="sug" hidden></ul>
-    </form>
-  </section>
+      <a href="https://splayer.lat/" class="card" data-category="cine" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=splayer.lat&sz=128" alt="Icono">
+          <span class="card-badge cine">Cine & Deportes</span>
+        </div>
+        <div class="card-title">SPlayer</div>
+      </a>
 
-  <nav class="filter-bar">
-    <button class="filter-btn active" onclick="filterCategory('all', this)" tabindex="0">Todos</button>
-    <button class="filter-btn" onclick="filterCategory('cine', this)" tabindex="0">Cine y Películas</button>
-    <button class="filter-btn" onclick="filterCategory('deportes', this)" tabindex="0">Fútbol y Deportes</button>
-    <button class="filter-btn" onclick="filterCategory('tv', this)" tabindex="0">TV Gratis</button>
-    <button class="filter-btn" onclick="filterCategory('streaming', this)" tabindex="0">Streaming</button>
-    <button class="filter-btn" onclick="filterCategory('personal', this)" tabindex="0">Personal</button>
-  </nav>
+      <a href="https://pluto.tv" class="card" data-category="tv" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
+          <span class="card-badge tv">TV Gratis</span>
+        </div>
+        <div class="card-title">Pluto TV</div>
+      </a>
 
-  <div class="controls-bar">
-    <h2>Canales y Accesos Directos</h2>
-    <button class="btn-action" onclick="openModal()" tabindex="0">+ Añadir Canal</button>
+      <a href="https://vix.com" class="card" data-category="tv" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=vix.com&sz=128" alt="Icono">
+          <span class="card-badge tv">TV Gratis</span>
+        </div>
+        <div class="card-title">ViX Gratis</div>
+      </a>
+
+      <a href="https://rakuten.tv" class="card" data-category="tv" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rakuten.tv&sz=128" alt="Icono">
+          <span class="card-badge tv">TV Gratis</span>
+        </div>
+        <div class="card-title">Rakuten TV</div>
+      </a>
+
+      <a href="https://watch.plex.tv" class="card" data-category="streaming" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=plex.tv&sz=128" alt="Icono">
+          <span class="card-badge">Streaming</span>
+        </div>
+        <div class="card-title">Plex TV</div>
+      </a>
+
+      <a href="https://youtube.com/tv" class="card" data-category="streaming" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
+          <span class="card-badge">Streaming</span>
+        </div>
+        <div class="card-title">YouTube TV</div>
+      </a>
+
+      <a href="https://pluto.tv/on-demand/sports" class="card" data-category="deportes" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
+          <span class="card-badge deportes">Deportes</span>
+        </div>
+        <div class="card-title">Pluto Deportes</div>
+      </a>
+
+      <a href="https://www.youtube.com/results?search_query=futbol+en+vivo" class="card" data-category="deportes" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
+          <span class="card-badge deportes">Deportes</span>
+        </div>
+        <div class="card-title">Fútbol en Vivo (YT)</div>
+      </a>
+
+      <a href="https://rtve.es/play/deportes" class="card" data-category="deportes" tabindex="0">
+        <div class="card-header">
+          <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rtve.es&sz=128" alt="Icono">
+          <span class="card-badge deportes">Deportes</span>
+        </div>
+        <div class="card-title">RTVE Deportes</div>
+      </a>
+    </main>
   </div>
 
-  <main class="grid" id="appsContainer">
-    <a href="https://cuevana3e.pro/" class="card" data-category="cine" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=cuevana3e.pro&sz=128" alt="Icono">
-        <span class="card-badge cine">Cine</span>
-      </div>
-      <div class="card-title">Cuevana 3</div>
-    </a>
-
-    <a href="https://peliculon-tv.vercel.app/" class="card" data-category="cine" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=peliculon-tv.vercel.app&sz=128" alt="Icono">
-        <span class="card-badge cine">Cine</span>
-      </div>
-      <div class="card-title">Peliculon TV</div>
-    </a>
-
-    <a href="https://splayer.lat/" class="card" data-category="cine" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=splayer.lat&sz=128" alt="Icono">
-        <span class="card-badge cine">Cine & Deportes</span>
-      </div>
-      <div class="card-title">SPlayer</div>
-    </a>
-
-    <a href="https://pluto.tv" class="card" data-category="tv" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
-        <span class="card-badge tv">TV Gratis</span>
-      </div>
-      <div class="card-title">Pluto TV</div>
-    </a>
-
-    <a href="https://vix.com" class="card" data-category="tv" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=vix.com&sz=128" alt="Icono">
-        <span class="card-badge tv">TV Gratis</span>
-      </div>
-      <div class="card-title">ViX Gratis</div>
-    </a>
-
-    <a href="https://rakuten.tv" class="card" data-category="tv" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rakuten.tv&sz=128" alt="Icono">
-        <span class="card-badge tv">TV Gratis</span>
-      </div>
-      <div class="card-title">Rakuten TV</div>
-    </a>
-
-    <a href="https://watch.plex.tv" class="card" data-category="streaming" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=plex.tv&sz=128" alt="Icono">
-        <span class="card-badge">Streaming</span>
-      </div>
-      <div class="card-title">Plex TV</div>
-    </a>
-
-    <a href="https://youtube.com/tv" class="card" data-category="streaming" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
-        <span class="card-badge">Streaming</span>
-      </div>
-      <div class="card-title">YouTube TV</div>
-    </a>
-
-    <a href="https://pluto.tv/on-demand/sports" class="card" data-category="deportes" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=pluto.tv&sz=128" alt="Icono">
-        <span class="card-badge deportes">Deportes</span>
-      </div>
-      <div class="card-title">Pluto Deportes</div>
-    </a>
-
-    <a href="https://www.youtube.com/results?search_query=futbol+en+vivo" class="card" data-category="deportes" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=128" alt="Icono">
-        <span class="card-badge deportes">Deportes</span>
-      </div>
-      <div class="card-title">Fútbol en Vivo (YT)</div>
-    </a>
-
-    <a href="https://rtve.es/play/deportes" class="card" data-category="deportes" tabindex="0">
-      <div class="card-header">
-        <img class="card-icon" src="https://www.google.com/s2/favicons?domain=rtve.es&sz=128" alt="Icono">
-        <span class="card-badge deportes">Deportes</span>
-      </div>
-      <div class="card-title">RTVE Deportes</div>
-    </a>
-    .ver { position: fixed; right: .6rem; bottom: .5rem; font-size: .7rem; color: #5a6478; opacity: .55; z-index: 5; }
-    .ver:hover { opacity: 1; }
-  </main>
   <div class="ver" id="ver"></div>
 
   <div class="modal" id="addModal">
@@ -468,7 +532,7 @@
         <option value="streaming">Streaming</option>
       </select>
       <button class="btn-action" onclick="saveShortcut()" tabindex="0">Guardar</button>
-      <button class="btn-action" style="background:transparent; color:white;" onclick="closeModal()" tabindex="0">Cancelar</button>
+      <button class="btn-action" style="background:transparent; color:white; border-color:transparent;" onclick="closeModal()" tabindex="0">Cancelar</button>
     </div>
   </div>
 
@@ -494,8 +558,7 @@
       fetch('/resultados', { method: 'HEAD' })
         .then(r => { if (!r.ok) fallback(); })
         .catch(fallback);
-    
-})();
+    })();
 
     // ---------- Buscador ----------
     const form = $('form'), input = $('q'), sugBox = $('sug');
@@ -677,13 +740,13 @@
     }
 
     loadCustomApps();
-  
+
     // Qué build está sirviendo esta página: si el número no cambia tras editar
     // el código, el servidor viejo sigue ocupando el puerto.
     fetch(API + '/api/version', { headers: { Accept: 'application/json' } })
       .then(r => r.json())
       .then(v => { const el = document.getElementById('ver'); if (el) el.textContent = 'tv v' + v.version + ' · ' + v.built; })
       .catch(() => {});
-</script>
+  </script>
 </body>
 </html>
