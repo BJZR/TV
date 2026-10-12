@@ -72,9 +72,17 @@ var platforms = []struct {
 	{"youtube.com", platform{"YouTube", "video"}},
 	{"youtu.be", platform{"YouTube", "video"}},
 	{"vimeo.com", platform{"Vimeo", "video"}},
+	{"dailymotion.com", platform{"Dailymotion", "video"}},
+	{"ok.ru", platform{"OK.ru", "video"}},
+	{"vk.com", platform{"VK Video", "video"}},
+	{"rumble.com", platform{"Rumble", "video"}},
+	{"tokyvideo.com", platform{"TokyVideo", "video"}},
 	{"archive.org", platform{"Archive.org", "video"}},
 	{"cuevana", platform{"Cuevana", "video"}},
 	{"splayer", platform{"SPlayer", "video"}},
+	{"pelisplus", platform{"PelisPlus", "video"}},
+	{"gnula", platform{"GNula", "video"}},
+	{"repelis", platform{"RePelis", "video"}},
 }
 
 // lookupPlatform devuelve la plataforma de un host y si es el primer dominio
@@ -448,7 +456,7 @@ func capHosts(rs []Result) []Result {
 
 // minMatch descarta las páginas que no hablan de la película buscada. Por
 // debajo de esto es ruido del buscador, aunque el título coincida en un detalle.
-const minMatch = 45
+const minMatch = 30
 
 // scoreResult puntúa un resultado contra la consulta (0..100).
 func scoreResult(r Result, p parsed) float64 {
@@ -479,10 +487,13 @@ func scoreResult(r Result, p parsed) float64 {
 func rankResults(rs []Result, p parsed) []Result {
 	out := make([]Result, 0, len(rs))
 	for _, r := range rs {
-		// Si el año va en el título y no es el pedido, es otra película con el
-		// mismo nombre: "matrix 1999" no debe traer "The Matrix Reloaded".
+		// Si se pidió un año específico y el resultado tiene otro año, es otra película.
 		if p.Year != "" {
-			if y := reYear.FindString(r.Title); y != "" && y != p.Year {
+			y := r.Year
+			if y == "" {
+				y = guessYear(r.Title, r.Snippet)
+			}
+			if y != "" && y != p.Year {
 				continue
 			}
 		}
